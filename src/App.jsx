@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Profile from './pages/Profile';
+import Sell from './pages/Sell';
+import ListingView from './pages/ListingView';
 import Header from './components/Header';
 
 function App() {
@@ -15,6 +18,9 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/sell" element={<Sell />} />
+            <Route path="/listing/:id" element={<ListingView />} />
           </Routes>
         </main>
       </div>

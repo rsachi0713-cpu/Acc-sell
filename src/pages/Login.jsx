@@ -1,15 +1,37 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login attempted with:", email);
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setSuccess("Successfully logged in! Redirecting...");
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+    }
   };
 
   return (
@@ -54,6 +76,9 @@ const Login = () => {
               <span className="px-2 bg-card text-gray-500">Or continue with</span>
             </div>
           </div>
+
+          {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm text-center">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -107,9 +132,10 @@ const Login = () => {
 
             <button
               type="submit"
-              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-gray-900 transition-all active:scale-[0.98]"
+              disabled={loading}
+              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-gray-900 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In <LogIn className="ml-2 w-4 h-4" />
+              {loading ? 'Signing in...' : 'Sign In'} {!loading && <LogIn className="ml-2 w-4 h-4" />}
             </button>
           </form>
 

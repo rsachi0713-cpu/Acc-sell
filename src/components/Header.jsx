@@ -1,8 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Globe, ChevronDown, User, LogIn, Menu } from 'lucide-react';
+import { Search, Globe, ChevronDown, User as UserIcon, LogIn, Menu, Plus } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const Header = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 bg-[#0d0f17]/90 backdrop-blur-md border-b border-gray-800">
       <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
@@ -54,12 +69,38 @@ const Header = () => {
           
           <div className="h-5 w-px bg-gray-700 hidden sm:block"></div>
           
-          <Link to="/login" className="hidden md:flex hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-gray-800/50">
-            Login
+          <Link to="/sell" className="hidden md:flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm transition-colors">
+            <Plus className="w-4 h-4" /> Sell
           </Link>
-          <Link to="/register" className="bg-primary hover:bg-primary-hover text-white px-4 py-1.5 rounded-md flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
-            Register
-          </Link>
+
+          {user ? (
+            <Link to="/profile" className="hidden md:flex items-center gap-2 hover:bg-gray-800/50 p-1.5 pr-4 rounded-full transition-colors border border-gray-700/50 ml-2">
+              {user.user_metadata?.avatar_url ? (
+                <img 
+                  src={user.user_metadata.avatar_url} 
+                  alt="Avatar" 
+                  className="w-8 h-8 rounded-full object-cover border border-primary/50"
+                  onError={(e) => e.target.src = "https://ui-avatars.com/api/?name=" + (user.user_metadata?.full_name || 'User') + "&background=2563eb&color=fff"}
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/50 flex items-center justify-center text-white font-bold uppercase text-xs">
+                  {user.user_metadata?.full_name ? user.user_metadata.full_name.charAt(0) : user.email.charAt(0)}
+                </div>
+              )}
+              <span className="text-gray-200 text-sm hidden lg:block">
+                {user.user_metadata?.full_name || 'My Profile'}
+              </span>
+            </Link>
+          ) : (
+            <>
+              <Link to="/login" className="hidden md:flex hover:text-white transition-colors px-3 py-1.5 rounded-md hover:bg-gray-800/50">
+                Login
+              </Link>
+              <Link to="/register" className="bg-primary hover:bg-primary-hover text-white px-4 py-1.5 rounded-md flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
+                Register
+              </Link>
+            </>
+          )}
           
           <button className="md:hidden p-2 text-gray-400 hover:text-white">
             <Menu className="w-5 h-5" />

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Star, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const AccountCard = ({ account }) => {
   return (
-    <div className="group glass-panel overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col h-full bg-[#181c2e] border border-gray-800">
+    <Link to={`/listing/${account.id}`} className="group glass-panel overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col h-full bg-[#181c2e] border border-gray-800 block">
       
       {/* Thumbnail & Seller Info Overlay */}
       <div className="relative h-40 overflow-hidden bg-gray-900">
@@ -68,7 +69,7 @@ const AccountCard = ({ account }) => {
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

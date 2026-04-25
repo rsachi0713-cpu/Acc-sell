@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, UserPlus } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -10,14 +11,45 @@ const Register = () => {
     password: '',
     confirmPassword: ''
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Registration attempted with:", formData);
+    setError('');
+    setSuccess('');
+    
+    if (formData.password !== formData.confirmPassword) {
+      return setError("Passwords do not match");
+    }
+
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          full_name: formData.name,
+        }
+      }
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setSuccess("Account successfully created! Logging you in...");
+      setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
+    }
   };
 
   return (
@@ -62,6 +94,9 @@ const Register = () => {
               <span className="px-2 bg-card text-gray-500">Or register with email</span>
             </div>
           </div>
+
+          {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">{error}</div>}
+          {success && <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm text-center">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -118,6 +153,24 @@ const Register = () => {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-500" />
+                </div>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="block w-full pl-10 pr-3 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary focus:border-primary text-gray-200 placeholder-gray-500 transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+
             <div className="flex items-start mt-2">
               <input
                 id="terms"
@@ -133,9 +186,10 @@ const Register = () => {
 
             <button
               type="submit"
-              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-gray-900 transition-all active:scale-[0.98] mt-2"
+              disabled={loading}
+              className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-gray-900 transition-all active:scale-[0.98] mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Account <UserPlus className="ml-2 w-4 h-4" />
+              {loading ? 'Processing...' : 'Create Account'} {!loading && <UserPlus className="ml-2 w-4 h-4" />}
             </button>
           </form>
 
