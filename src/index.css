@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0f111a;
+  --color-card: #171a26;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-gray-200 font-sans antialiased;
+  }
+}
+
+.glass-panel {
+  @apply bg-card/80 backdrop-blur-md border border-gray-700/50 rounded-xl;
+}
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
