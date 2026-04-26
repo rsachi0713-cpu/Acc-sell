@@ -34,6 +34,25 @@ const Login = () => {
     }
   };
 
+  const handleResendConfirmation = async () => {
+    setLoading(true);
+    setError('');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setSuccess("Confirmation email resent! Please check your inbox.");
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background -z-10"></div>
@@ -77,7 +96,19 @@ const Login = () => {
             </div>
           </div>
 
-          {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">{error}</div>}
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">
+              {error}
+              {error === "Email not confirmed" && (
+                <button 
+                  onClick={handleResendConfirmation}
+                  className="block w-full mt-2 text-primary hover:text-primary-hover underline font-medium"
+                >
+                  Resend confirmation email
+                </button>
+              )}
+            </div>
+          )}
           {success && <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm text-center">{success}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-4">

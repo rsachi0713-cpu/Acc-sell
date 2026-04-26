@@ -3,35 +3,36 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Filter, ChevronDown, CheckCircle2, ShieldCheck, Gamepad2, Star } from 'lucide-react';
 import AccountCard from '../components/AccountCard';
+import { supabase } from '../supabaseClient';
 
 const subCategoriesConfig = {
   games: [
-    { id: 'all_games', name: 'All Games', count: 420 },
-    { id: 'freefire', name: 'Free Fire', count: 124 },
-    { id: 'pubg', name: 'PUBG Mobile', count: 85 },
-    { id: 'cod', name: 'CoD Mobile', count: 62 },
-    { id: 'coc', name: 'Clash of Clans', count: 45 },
-    { id: 'mlbb', name: 'Mobile Legends', count: 38 },
+    { id: 'all_games', name: 'All Games' },
+    { id: 'freefire', name: 'Free Fire' },
+    { id: 'pubg', name: 'PUBG Mobile' },
+    { id: 'cod', name: 'CoD Mobile' },
+    { id: 'coc', name: 'Clash of Clans' },
+    { id: 'mlbb', name: 'Mobile Legends' },
   ],
   tiktok: [
-    { id: 'all_tiktok', name: 'All TikTok', count: 156 },
-    { id: 'gaming', name: 'Gaming Niche', count: 45 },
-    { id: 'entertainment', name: 'Entertainment', count: 82 },
+    { id: 'all_tiktok', name: 'All TikTok' },
+    { id: 'gaming', name: 'Gaming Niche' },
+    { id: 'entertainment', name: 'Entertainment' },
   ],
   youtube: [
-    { id: 'all_yt', name: 'All Channels', count: 98 },
-    { id: 'monetized', name: 'Monetized', count: 41 },
-    { id: 'vlog', name: 'Vlogging', count: 39 },
+    { id: 'all_yt', name: 'All Channels' },
+    { id: 'monetized', name: 'Monetized' },
+    { id: 'vlog', name: 'Vlogging' },
   ],
   facebook: [
-    { id: 'all_fb', name: 'All Pages', count: 87 },
-    { id: 'groups', name: 'Groups', count: 32 },
-    { id: 'fanpage', name: 'Fan Pages', count: 55 },
+    { id: 'all_fb', name: 'All Pages' },
+    { id: 'groups', name: 'Groups' },
+    { id: 'fanpage', name: 'Fan Pages' },
   ],
   other: [
-    { id: 'all_other', name: 'All Others', count: 45 },
-    { id: 'instagram', name: 'Instagram', count: 22 },
-    { id: 'twitter', name: 'Twitter/X', count: 14 },
+    { id: 'all_other', name: 'All Others' },
+    { id: 'instagram', name: 'Instagram' },
+    { id: 'twitter', name: 'Twitter/X' },
   ]
 };
 
@@ -43,70 +44,6 @@ const mainPlatforms = [
   { id: 'other', name: 'Others', icon: '📦', color: 'bg-gray-600/20 text-gray-400 border-gray-500/30' },
 ];
 
-const generateMockData = (platform, tab, onlineFilter) => {
-  const titles = {
-    games: {
-      freefire: ["Free Fire | Max Level | Rare Bundles + 15k Diamonds", "FF Account | Cobra MP40 | V Badge", "Free Fire Indonesia | Vault 200+"],
-      pubg: ["PUBG Mobile | Conqueror Rank | Glacier M4 Max", "PUBG Global | Mythic Fashion | 60+ Suits", "PUBG Mobile | Rare X-Suits | Level 80"],
-      cod: ["CoD Mobile | Damascus Camo | Mythic DLQ", "CODM | Legendary Characters | 15+ Legendaries"],
-      coc: ["Clash of Clans | TH15 Max | 10k Gems", "CoC | TH14 | High Hero Levels | Built Base"],
-      mlbb: ["Mobile Legends | Mythic Glory | 250 Skins", "MLBB | All Assassins | Collector Skins Max"],
-      all_games: []
-    },
-    tiktok: {
-      gaming: ["TikTok | 150k Followers | Gaming Niche | Highly Active", "TikTok | 50k Subs | eSports Highlight"],
-      entertainment: ["TikTok | 1M Followers | Comedy/Entertainment", "TikTok Viral Account | 20M+ Likes"],
-      all_tiktok: []
-    },
-    youtube: {
-      monetized: ["YouTube | Monetized | 10k Subs | No Strikes", "Monetized YT Channel | Organic 50k Subs"],
-      vlog: ["YouTube | 100k Subs | Daily Vlogs | Silver Play Button", "Vlogging Channel | Travel Niche 20k"],
-      all_yt: []
-    },
-    facebook: {
-      groups: ["FB Group | 500k Members | Anime Niche", "Active Facebook Group | 1M+ Members"],
-      fanpage: ["FB Page | 1M Likes | Entertainment & Media", "Verified FB Page | Blue Badge Status"],
-      all_fb: []
-    },
-    other: {
-      instagram: ["Instagram | 500k Followers | Verified Blue Tick", "IG Account | 100k Organic | Fashion Niche"],
-      twitter: ["Twitter/X | Premium | 50k Followers | Active", "X Account | Crypto Niche | 100k Followers"],
-      all_other: []
-    }
-  };
-
-  let availableTitles = [];
-  if (tab.startsWith('all_') && titles[platform]) {
-    Object.keys(titles[platform]).forEach(key => {
-      availableTitles.push(...titles[platform][key]);
-    });
-  } else if (titles[platform] && titles[platform][tab]) {
-    availableTitles = titles[platform][tab];
-  }
-  
-  if (availableTitles.length === 0) {
-     availableTitles = [`Premium ${platform} Asset | High Value`];
-  }
-
-  return Array(12).fill(0).map((_, i) => {
-    const isOnline = Math.random() > 0.4;
-    return {
-      id: `${platform}-${tab}-${i}`,
-      title: availableTitles[Math.floor(Math.random() * availableTitles.length)],
-      price: (Math.random() * 450 + 15).toFixed(2),
-      type: ['Full Access', 'Account', 'Verified Page'][Math.floor(Math.random() * 3)],
-      server: ['Global', 'US', 'Asia', 'Europe', 'Indonesia'][Math.floor(Math.random() * 5)],
-      seller: {
-        name: ['GameNews', 'SocialKing', 'PremiumAccs', 'VerifiedSeller'][Math.floor(Math.random() * 4)],
-        rating: (Math.random() * 0.5 + 4.5).toFixed(1),
-        reviews: Math.floor(Math.random() * 1000) + 10,
-        online: isOnline
-      },
-      thumbnail: `https://picsum.photos/seed/${platform}${tab}${i}/400/225`
-    };
-  }).filter(acc => onlineFilter ? acc.seller.online : true);
-};
-
 const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlPlatform = searchParams.get('platform') || 'games';
@@ -114,6 +51,42 @@ const Home = () => {
   const [activePlatform, setActivePlatform] = useState(urlPlatform);
   const [activeTab, setActiveTab] = useState(subCategoriesConfig[urlPlatform]?.[0]?.id || 'all_games');
   const [onlineOnly, setOnlineOnly] = useState(false);
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real listings from Supabase
+  useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select('*, profiles:seller_id(username, full_name, avatar_url, is_online, rating, reviews)');
+
+        if (error) throw error;
+
+        const transformedData = (data || []).map(item => ({
+          ...item,
+          id: item.id || item.listing_id,
+          seller: {
+            name: item.profiles?.full_name || item.profiles?.username || 'Unknown Seller',
+            avatar: item.profiles?.avatar_url,
+            rating: item.profiles?.rating || '5.0',
+            reviews: item.profiles?.reviews || 0,
+            online: item.profiles?.is_online || false
+          }
+        }));
+
+        setListings(transformedData);
+      } catch (err) {
+        console.error('Error fetching listings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListings();
+  }, []);
 
   // Sync state when URL changes from Header dropdown
   useEffect(() => {
@@ -123,18 +96,44 @@ const Home = () => {
     }
   }, [urlPlatform, activePlatform]);
 
-  // When platform changes, we should ideally reset the active tab. For simplicity in render:
-  const currentSubTabs = subCategoriesConfig[activePlatform] || subCategoriesConfig['games'];
-
   // Handle platform change
   const handlePlatformChange = (id) => {
     setSearchParams({ platform: id });
-    // URL change triggers the useEffect
   };
 
+  // Calculate counts for subcategories based on current listings
+  const currentSubTabs = useMemo(() => {
+    const config = subCategoriesConfig[activePlatform] || subCategoriesConfig['games'];
+    const platformListings = listings.filter(l => l.platform === activePlatform);
+    
+    return config.map(tab => {
+      let count = 0;
+      if (tab.id.startsWith('all_')) {
+        count = platformListings.length;
+      } else {
+        count = platformListings.filter(l => l.subcategory === tab.id).length;
+      }
+      return { ...tab, count };
+    });
+  }, [listings, activePlatform]);
+
   const displayedAccounts = useMemo(() => {
-    return generateMockData(activePlatform, activeTab, onlineOnly);
-  }, [activePlatform, activeTab, onlineOnly]);
+    return listings.filter(acc => {
+      // Platform filter
+      const platformMatch = acc.platform === activePlatform;
+      
+      // Tab/Subcategory filter
+      let subMatch = true;
+      if (!activeTab.startsWith('all_')) {
+        subMatch = acc.subcategory === activeTab;
+      }
+      
+      // Online filter
+      const onlineMatch = onlineOnly ? acc.seller.online : true;
+      
+      return platformMatch && subMatch && onlineMatch;
+    });
+  }, [listings, activePlatform, activeTab, onlineOnly]);
 
   return (
     <div className="pb-20">

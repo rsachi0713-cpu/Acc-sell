@@ -2,56 +2,81 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 const ListingView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-
-  // Parse details from seed ID if possible (e.g. games-pubg-1), otherwise use defaults
-  const platformStr = id?.split('-')[0] || 'Asset';
-  const capPlatform = platformStr.charAt(0).toUpperCase() + platformStr.slice(1);
-  const subCategoryStr = id?.split('-')[1] || 'Premium';
-  const capSubCategory = subCategoryStr.charAt(0).toUpperCase() + subCategoryStr.slice(1);
-
-  // Generate a mock gallery of images based on the ID
-  const gallery = Array(6).fill(0).map((_, i) => `https://picsum.photos/seed/${id}${i}/800/450`);
-  const [activeImage, setActiveImage] = useState(gallery[0]);
-
-  // Mock data simulation based on ID, wrapped in useMemo so it doesn't change on re-render
-  const item = useMemo(() => {
-    return {
-      id,
-      title: `${capPlatform} Premium Account | Max Level | Exclusive Access`,
-      price: (Math.random() * 450 + 15).toFixed(2),
-      type: 'Full Access',
-      server: 'Global',
-      description: `This is a highly sought-after digital asset. It comes fully equipped with all verified credentials. You will receive full original email access, completely unlinked from any social networks.\n\n• Instant Delivery via Email\n• Lifetime warranty against pullbacks\n• 100% clean history, no bans or shadowbans\n\nTake advantage of this limited-time offer. Once bought, details are transferred directly to you.`,
-      thumbnail: `https://picsum.photos/seed/${id}/800/450`,
-      seller: {
-        name: 'PremiumAccs',
-        rating: 4.8,
-        reviews: 429,
-        joined: '2023',
-        online: true,
-        avatar: `https://ui-avatars.com/api/?name=PremiumAccs&background=1e293b&color=fff`
-      }
-    };
-  }, [id, capPlatform]);
+  const [item, setItem] = useState(null);
+  const [activeImage, setActiveImage] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulate network fetch
+    const fetchListing = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('listings')
+          .select('*, profiles:seller_id(username, full_name, avatar_url, is_online, rating, reviews, created_at)')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        if (data) {
+          const transformedItem = {
+            ...data,
+            seller: {
+              name: data.profiles?.full_name || data.profiles?.username || 'Unknown Seller',
+              rating: data.profiles?.rating || '5.0',
+              reviews: data.profiles?.reviews || 0,
+              joined: data.profiles?.created_at ? new Date(data.profiles.created_at).getFullYear() : '2024',
+              online: data.profiles?.is_online || false,
+              avatar: data.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${data.profiles?.username || 'U'}&background=1e293b&color=fff`
+            }
+          };
+          setItem(transformedItem);
+          // Set first image as active
+          const images = transformedItem.image_urls || [];
+          setActiveImage(images.length > 0 ? images[0] : transformedItem.thumbnail || '');
+        }
+      } catch (err) {
+        console.error('Error fetching listing:', err);
+        setError('Listing not found or connection error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchListing();
     window.scrollTo(0, 0);
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
   }, [id]);
+
+  const gallery = useMemo(() => {
+    if (!item) return [];
+    if (item.image_urls && item.image_urls.length > 0) {
+      return item.image_urls;
+    }
+    return [item.thumbnail || 'https://picsum.photos/800/450'];
+  }, [item]);
 
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4">
+        <h2 className="text-2xl font-bold text-white mb-4">{error || 'Listing not found'}</h2>
+        <button onClick={() => navigate('/')} className="bg-primary px-6 py-2 rounded-lg text-white font-medium">
+          Return to Marketplace
+        </button>
       </div>
     );
   }
@@ -71,9 +96,9 @@ const ListingView = () => {
         <div className="flex items-center gap-2 text-xs md:text-sm text-gray-500">
           <span className="hover:text-gray-300 cursor-pointer transition-colors">Marketplace</span>
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="hover:text-gray-300 cursor-pointer transition-colors">{capPlatform}</span>
+          <span className="hover:text-gray-300 cursor-pointer transition-colors uppercase">{item.platform}</span>
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-gray-300">{capSubCategory}</span>
+          <span className="text-gray-300 uppercase">{item.subcategory}</span>
         </div>
 
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight">
@@ -130,35 +155,36 @@ const ListingView = () => {
         </div>
 
         {/* Right Column - Buy Box & Seller Info */}
-        <div className="space-y-6">
-          <div
-            className="glass-panel p-6 border-t-4 border-t-primary relative overflow-hidden sticky top-24"
-          >
-            <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
+        <div className="flex flex-col gap-6">
+          <div className="glass-panel p-6 border-t-4 border-t-primary relative overflow-hidden h-fit">
+            <div className="absolute -top-4 -right-4 p-3 opacity-5 pointer-events-none">
               <ShoppingCart className="w-32 h-32" />
             </div>
             
-            <div className="flex items-end gap-2 mb-6 border-b border-gray-800 pb-6">
-              <span className="text-4xl font-extrabold text-white">${item.price}</span>
-              <span className="text-gray-400 mb-1">USD</span>
+            <div className="flex items-baseline justify-between mb-6 border-b border-gray-800 pb-6">
+              <span className="text-gray-400 text-sm">Price</span>
+              <div className="text-right">
+                <div className="text-3xl font-extrabold text-white">Rs. {item.price}</div>
+                <div className="text-primary text-xs font-bold mt-1">Verified Listing</div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+            <div className="grid grid-cols-2 gap-3 mb-6 text-sm">
               <div className="bg-[#0f111a] p-3 rounded-xl border border-gray-700/50">
-                <span className="text-gray-500 text-xs flex items-center gap-1.5 mb-1"><Globe className="w-3.5 h-3.5"/> Server</span>
+                <span className="text-gray-500 text-[10px] uppercase font-bold flex items-center gap-1.5 mb-1"><Globe className="w-3.5 h-3.5"/> Server</span>
                 <span className="text-gray-200 font-semibold">{item.server}</span>
               </div>
               <div className="bg-[#0f111a] p-3 rounded-xl border border-gray-700/50">
-                <span className="text-gray-500 text-xs flex items-center gap-1.5 mb-1"><Cpu className="w-3.5 h-3.5"/> Access</span>
+                <span className="text-gray-500 text-[10px] uppercase font-bold flex items-center gap-1.5 mb-1"><Cpu className="w-3.5 h-3.5"/> Access</span>
                 <span className="text-gray-200 font-semibold">{item.type}</span>
               </div>
               <div className="col-span-2 bg-[#0f111a] p-3 rounded-xl border border-gray-700/50 flex items-center justify-between">
-                <span className="text-gray-500 text-xs flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> Delivery Time</span>
-                <span className="text-green-400 font-semibold text-xs bg-green-400/10 px-2 py-0.5 rounded">Instant</span>
+                <span className="text-gray-500 text-[10px] uppercase font-bold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> Delivery</span>
+                <span className="text-green-400 font-semibold text-xs bg-green-400/10 px-2 py-0.5 rounded">{item.delivery_time || 'Instant'}</span>
               </div>
             </div>
 
-            <button className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mb-3 active:scale-[0.98]">
+            <button className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mb-4 active:scale-[0.98]">
                <ShoppingCart className="w-5 h-5"/> Buy Now
             </button>
             <div className="flex items-center justify-center gap-1.5 text-xs text-green-400">
@@ -166,24 +192,24 @@ const ListingView = () => {
             </div>
           </div>
 
-          <div
-            className="glass-panel p-6"
-          >
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">About the Seller</h3>
-            <div className="flex items-start gap-4 mb-5">
+          <div className="glass-panel p-6">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">About the Seller</h3>
+            <div className="flex items-center gap-4 mb-5">
               <div className="relative">
-                <img src={item.seller.avatar} alt={item.seller.name} className="w-12 h-12 rounded-full border-2 border-gray-700" />
+                <img src={item.seller.avatar} alt={item.seller.name} className="w-12 h-12 rounded-full border-2 border-gray-700 object-cover" />
                 {item.seller.online && (
                   <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#12141d] rounded-full"></div>
                 )}
               </div>
-              <div>
-                <h4 className="text-white font-bold flex items-center gap-1">{item.seller.name} <CheckCircle2 className="w-4 h-4 text-primary" /></h4>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-white font-bold flex items-center gap-1 truncate">
+                  {item.seller.name} 
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                </h4>
                 <div className="flex items-center gap-1.5 text-sm text-yellow-500 font-medium">
                   <Star className="w-3.5 h-3.5 fill-yellow-500" />
                   {item.seller.rating} <span className="text-gray-500 font-normal">({item.seller.reviews} sales)</span>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Joined {item.seller.joined}</div>
               </div>
             </div>
 

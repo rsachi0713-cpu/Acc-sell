@@ -63,11 +63,10 @@ const Header = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-3 md:gap-4 text-sm font-medium text-gray-300">
-          <button className="hidden sm:flex items-center gap-1 hover:text-white transition-colors">
-            USD <ChevronDown className="w-3 h-3" />
-          </button>
-          
-          <div className="h-5 w-px bg-gray-700 hidden sm:block"></div>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+                <span className="text-xs font-bold text-gray-300">LKR</span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+              </button>
           
           <Link to="/sell" className="hidden md:flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm transition-colors">
             <Plus className="w-4 h-4" /> Sell

@@ -36,7 +36,8 @@ const Register = () => {
       options: {
         data: {
           full_name: formData.name,
-        }
+        },
+        emailRedirectTo: window.location.origin
       }
     });
 
@@ -44,11 +45,11 @@ const Register = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      setSuccess("Account successfully created! Logging you in...");
+      setSuccess("Account created successfully! Please check your email and click the confirmation link before signing in.");
       setFormData({ name: '', email: '', password: '', confirmPassword: '' });
       setTimeout(() => {
-        navigate('/');
-      }, 1500);
+        navigate('/login');
+      }, 4000);
     }
   };
 

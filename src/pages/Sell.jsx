@@ -43,8 +43,9 @@ const Sell = () => {
     subcategory: 'freefire',
     server: 'Global',
     type: 'Full Access',
+    delivery_time: 'Instant',
     description: '',
-    thumbnail: ''
+    images: [] // Store multiple image URLs
   });
 
   useEffect(() => {
@@ -69,32 +70,43 @@ const Sell = () => {
     });
   };
 
-  const uploadThumbnail = async (event) => {
+  const uploadImages = async (event) => {
     try {
       setLoading(true);
       setMessage({ text: '', type: '' });
 
-      const file = event.target.files[0];
-      if (!file) return;
+      const files = Array.from(event.target.files);
+      if (files.length === 0) return;
 
-      // Make sure the user has a "listings" bucket created in Supabase!
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const uploadPromises = files.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('listings')
-        .upload(fileName, file);
+        const { error: uploadError } = await supabase.storage
+          .from('listings')
+          .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('listings').getPublicUrl(fileName);
-      setFormData(prev => ({ ...prev, thumbnail: data.publicUrl }));
-      setMessage({ text: 'Thumbnail uploaded successfully!', type: 'success' });
+        const { data } = supabase.storage.from('listings').getPublicUrl(fileName);
+        return data.publicUrl;
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...urls] }));
+      setMessage({ text: `${urls.length} images uploaded successfully!`, type: 'success' });
     } catch (error) {
-      setMessage({ text: error.message || 'Error uploading. Make sure you created a "listings" storage bucket!', type: 'error' });
+      setMessage({ text: error.message || 'Error uploading images.', type: 'error' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const removeImage = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, index) => index !== indexToRemove)
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -113,8 +125,10 @@ const Sell = () => {
           subcategory: formData.subcategory,
           server: formData.server,
           type: formData.type,
+          delivery_time: formData.delivery_time,
           description: formData.description,
-          thumbnail: formData.thumbnail || 'https://picsum.photos/400/225'
+          thumbnail: formData.images[0] || 'https://picsum.photos/400/225',
+          image_urls: formData.images
         }
       ]);
 
@@ -123,7 +137,7 @@ const Sell = () => {
       setMessage({ text: 'Listing created successfully! Your account is now live.', type: 'success' });
       // Reset form after success
       setFormData({
-        title: '', price: '', platform: 'games', subcategory: 'freefire', server: 'Global', type: 'Full Access', description: '', thumbnail: ''
+        title: '', price: '', platform: 'games', subcategory: 'freefire', server: 'Global', type: 'Full Access', delivery_time: 'Instant', description: '', images: []
       });
       
       setTimeout(() => navigate('/'), 2000);
@@ -185,19 +199,20 @@ const Sell = () => {
                  placeholder="e.g. Max Level PUBG Account..."
                />
              </div>
-             <div>
-               <label className="block text-sm font-medium text-gray-300 mb-1">Price (USD)</label>
-               <input
-                 type="number"
-                 name="price"
-                 step="0.01"
-                 required
-                 value={formData.price}
-                 onChange={handleChange}
-                 className="block w-full px-4 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary text-gray-200"
-                 placeholder="0.00"
-               />
-             </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Price (Rs.)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">Rs.</span>
+                    <input
+                      type="number"
+                      required
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      className="w-full bg-[#0a0c10] border border-gray-800 rounded-xl py-4 pl-12 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all font-medium"
+                      placeholder="5000"
+                    />
+                  </div>
+                </div>
           </div>
 
           {/* Categorization */}
@@ -243,10 +258,15 @@ const Sell = () => {
                  className="block w-full px-4 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary text-gray-200"
                >
                  <option>Global</option>
-                 <option>US</option>
+                 <option>Singapore</option>
+                 <option>Middle East</option>
                  <option>Asia</option>
-                 <option>Europe</option>
+                 <option>North America (NA)</option>
+                 <option>Europe (EU)</option>
+                 <option>South America</option>
                  <option>Indonesia</option>
+                 <option>India</option>
+                 <option>SEA</option>
                </select>
              </div>
              <div>
@@ -258,27 +278,53 @@ const Sell = () => {
                  className="block w-full px-4 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary text-gray-200"
                >
                  <option>Full Access</option>
-                 <option>Account</option>
+                 <option>Account Only</option>
+                 <option>Login Only</option>
                  <option>Verified Page</option>
                </select>
              </div>
-          </div>
+             <div>
+               <label className="block text-sm font-medium text-gray-300 mb-1">Delivery Time</label>
+               <select
+                 name="delivery_time"
+                 value={formData.delivery_time}
+                 onChange={handleChange}
+                 className="block w-full px-4 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary text-gray-200"
+               >
+                 <option>Instant</option>
+                 <option>1-6 Hours</option>
+                 <option>12 Hours</option>
+                 <option>24 Hours</option>
+                 <option>2-3 Days</option>
+               </select>
+             </div>
+           </div>
 
-          {/* Upload Image */}
+          {/* Upload Images */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Cover Image (Thumbnail)</label>
-            <div className="flex items-center gap-4">
-              {formData.thumbnail && (
-                <img src={formData.thumbnail} className="w-24 h-16 object-cover rounded-md border border-gray-700" alt="Preview" />
-              )}
-              <label className="cursor-pointer flex items-center justify-center gap-2 py-2 px-4 border border-gray-700 rounded-lg shadow-sm text-sm font-medium text-white bg-gray-800/80 hover:bg-gray-700 transition-colors">
-                <Upload className="w-4 h-4" />
-                Upload Image
+            <label className="block text-sm font-medium text-gray-300 mb-2">Account Images (Screenshots)</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              {formData.images.map((url, index) => (
+                <div key={index} className="relative group aspect-video">
+                  <img src={url} className="w-full h-full object-cover rounded-lg border border-gray-700" alt={`Preview ${index}`} />
+                  <button 
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  >
+                    <Plus className="w-4 h-4 rotate-45" />
+                  </button>
+                </div>
+              ))}
+              <label className="cursor-pointer aspect-video flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-700 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group">
+                <Upload className="w-6 h-6 text-gray-500 group-hover:text-primary transition-colors" />
+                <span className="text-xs text-gray-500 group-hover:text-primary">Add Image</span>
                 <input
                   type="file"
                   className="hidden"
                   accept="image/*"
-                  onChange={uploadThumbnail}
+                  multiple
+                  onChange={uploadImages}
                   disabled={loading}
                 />
               </label>
