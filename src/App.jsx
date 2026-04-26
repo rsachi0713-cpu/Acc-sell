@@ -6,6 +6,9 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Sell from './pages/Sell';
 import ListingView from './pages/ListingView';
+import SellerDashboard from './pages/SellerDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
 import Header from './components/Header';
 
 function App() {
@@ -18,7 +21,9 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard" element={<SellerDashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/listing/:id" element={<ListingView />} />
           </Routes>

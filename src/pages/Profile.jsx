@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Mail, Save, LogOut, Upload, ArrowLeft, Plus, CheckCircle2, Star, MessageSquare, ShieldAlert, Clock, Cpu, Globe, X, AlertCircle } from 'lucide-react';
+import { User, Mail, Save, LogOut, Upload, ArrowLeft, Plus, CheckCircle2, Star, MessageSquare, ShieldAlert, Clock, Cpu, Globe, X, AlertCircle, ShoppingBag, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [initialData, setInitialData] = useState({ fullName: '', avatarUrl: '' });
@@ -34,7 +35,6 @@ const Profile = () => {
       setAvatarUrl(fetchedAvatarUrl);
       setInitialData({ fullName: fetchedFullName, avatarUrl: fetchedAvatarUrl });
       setLoading(false);
-      fetchMyListings(session.user.id);
     };
 
     fetchUser();
@@ -91,6 +91,37 @@ const Profile = () => {
       }, 3000);
     }
     setSaving(false);
+  };
+
+  const handleSwitchRole = async () => {
+    setSaving(true);
+    const newRole = role === 'seller' ? 'buyer' : 'seller';
+    
+    try {
+      // 1. Update Auth Metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { role: newRole }
+      });
+      if (authError) throw authError;
+
+      // 2. Update Profiles Table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', user.id);
+      if (profileError) throw profileError;
+
+      setMessage({ text: `Switched to ${newRole} mode!`, type: 'success' });
+      
+      // Force reload to update all components and session
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+    } catch (err) {
+      setMessage({ text: err.message, type: 'error' });
+      setSaving(false);
+    }
   };
 
   const uploadAvatar = async (event) => {
@@ -194,7 +225,7 @@ const Profile = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate('/');
+    window.location.href = '/';
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading Profile...</div>;
@@ -250,47 +281,87 @@ const Profile = () => {
               <label className="text-xs font-bold text-gray-500 uppercase">Full Name</label>
               <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg p-2.5 text-white" />
             </div>
-            <button type="submit" disabled={saving} className="w-full bg-primary py-2.5 rounded-lg text-white font-bold hover:bg-primary-hover">Save Changes</button>
-            <button type="button" onClick={handleLogout} className="w-full bg-gray-800/50 text-red-400 py-2.5 rounded-lg font-medium hover:bg-gray-800">Logout</button>
+            <button type="submit" disabled={saving} className="w-full bg-primary py-2.5 rounded-lg text-white font-bold hover:bg-primary-hover transition-all">Save Changes</button>
           </form>
+          
+          <div className="mt-6 pt-6 border-t border-gray-800">
+            <p className="text-[10px] font-bold text-gray-500 uppercase mb-3">Account Mode</p>
+            <button 
+              onClick={handleSwitchRole}
+              disabled={saving}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold transition-all border ${
+                role === 'seller' 
+                ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20' 
+                : 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
+              }`}
+            >
+              {role === 'seller' ? (<><ShoppingBag className="w-4 h-4"/> Switch to Buyer Mode</>) : (<><Cpu className="w-4 h-4"/> Switch to Seller Mode</>)}
+            </button>
+          </div>
+
+          <button type="button" onClick={handleLogout} className="w-full mt-4 bg-gray-800/50 text-red-400 py-2.5 rounded-lg font-medium hover:bg-gray-800">Logout</button>
         </div>
       </div>
 
       {/* Main Content - Activity/Listings */}
       <div className="md:col-span-2">
-        <h2 className="text-2xl font-bold text-white mb-6">My Activity</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">{role === 'seller' ? 'Seller Dashboard' : 'My Account'}</h2>
         <div className="space-y-4">
           <div className="flex gap-4 mb-8">
             <div className="flex-1 glass-panel p-4 text-center">
-              <div className="text-2xl font-bold text-white">{myListings.length}</div>
-              <div className="text-xs text-gray-500 uppercase font-bold">Listings</div>
+              <div className="text-2xl font-bold text-white text-primary">{role === 'seller' ? myListings.length : 0}</div>
+              <div className="text-xs text-gray-500 uppercase font-bold">{role === 'seller' ? 'Listings' : 'Orders'}</div>
             </div>
             <div className="flex-1 glass-panel p-4 text-center">
-              <div className="text-2xl font-bold text-white">0</div>
-              <div className="text-xs text-gray-500 uppercase font-bold">Sales</div>
+              <div className="text-2xl font-bold text-white text-primary">0</div>
+              <div className="text-xs text-gray-500 uppercase font-bold">{role === 'seller' ? 'Sales' : 'Favorites'}</div>
             </div>
           </div>
 
-          <div className="flex justify-between items-center border-b border-gray-800 pb-2 mb-4">
-            <h3 className="text-lg font-bold text-white">Your Posters</h3>
-            <button onClick={() => navigate('/sell')} className="text-primary text-sm font-bold">+ New Listing</button>
-          </div>
+          {role === 'seller' ? (
+            <>
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2 mb-4">
+                <h3 className="text-lg font-bold text-white">Your Posters</h3>
+                <button onClick={() => navigate('/sell')} className="text-primary text-sm font-bold">+ New Listing</button>
+              </div>
 
-          {listingsLoading ? <div className="text-gray-500">Loading...</div> : myListings.length === 0 ? <div className="text-gray-500">No listings yet.</div> : (
-            <div className="grid gap-4">
-              {myListings.map(listing => (
-                <div key={listing.id} className="glass-panel p-4 flex gap-4 items-center">
-                  <img src={listing.thumbnail} className="w-20 h-14 object-cover rounded shadow" alt="" />
-                  <div className="flex-1">
-                    <h4 className="text-white font-semibold truncate">{listing.title}</h4>
-                    <p className="text-primary font-bold text-sm leading-none mt-1">${listing.price}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditingListing(listing)} className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"><Plus className="w-5 h-5 rotate-45" style={{ transform: 'rotate(0deg)' }} /></button>
-                    <button onClick={() => handleDeleteListing(listing.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors"><ShieldAlert className="w-5 h-5" /></button>
-                  </div>
+              {listingsLoading ? (
+                <div className="text-gray-500">Loading...</div>
+              ) : myListings.length === 0 ? (
+                <div className="text-gray-500">No listings yet.</div>
+              ) : (
+                <div className="grid gap-4">
+                  {myListings.map(listing => (
+                    <div key={listing.id} className="glass-panel p-4 flex gap-4 items-center group">
+                      <img src={listing.thumbnail} className="w-20 h-14 object-cover rounded-lg shadow-xl" alt="" />
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold truncate">{listing.title}</h4>
+                        <p className="text-primary font-bold text-sm leading-none mt-1">Rs. {listing.price}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingListing(listing)} className="p-2 hover:bg-primary/20 rounded-lg text-gray-400 hover:text-primary transition-colors">
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => handleDeleteListing(listing.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </>
+          ) : (
+            <div className="glass-panel p-12 text-center">
+              <ShoppingBag className="w-16 h-16 text-gray-700 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No Orders Yet</h3>
+              <p className="text-gray-500 max-w-xs mx-auto mb-6">You haven't purchased any digital assets yet. Browse our marketplace to find premium accounts.</p>
+              <button 
+                onClick={() => navigate('/')} 
+                className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary/20"
+              >
+                Start Shopping
+              </button>
             </div>
           )}
         </div>

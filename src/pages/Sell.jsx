@@ -48,14 +48,45 @@ const Sell = () => {
     images: [] // Store multiple image URLs
   });
 
+  const [isVerified, setIsVerified] = useState(false);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate('/login');
-      } else {
-        setUser(session.user);
+        return;
       }
-    });
+
+      // Fetch profile for verification status
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, is_verified')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile?.role !== 'seller' && profile?.role !== 'admin') {
+        // Automatically upgrade Buyer to Seller if they try to sell
+        await supabase
+          .from('profiles')
+          .update({ role: 'seller' })
+          .eq('id', session.user.id);
+        
+        // Also update auth metadata
+        await supabase.auth.updateUser({
+          data: { role: 'seller' }
+        });
+        
+        // Refresh the page to apply changes
+        window.location.reload();
+        return;
+      }
+
+      setUser(session.user);
+      setIsVerified(profile?.is_verified || false);
+    };
+
+    checkUser();
   }, [navigate]);
 
   const handleChange = (e) => {
@@ -176,6 +207,18 @@ const Sell = () => {
           </div>
         </div>
 
+         {!isVerified && (
+           <div className="mb-8 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-4">
+             <div className="p-3 bg-red-500/20 rounded-xl">
+               <ShieldCheck className="w-8 h-8 text-red-500" />
+             </div>
+             <div>
+               <h3 className="text-lg font-bold text-white mb-1">Account Verification Required</h3>
+               <p className="text-sm text-gray-400">To maintain marketplace security, your account must be verified by an admin before posting. This process usually takes 1-24 hours.</p>
+             </div>
+           </div>
+         )}
+
         {message.text && (
           <div className={`mb-6 p-4 rounded-lg text-sm text-center font-medium ${
             message.type === 'error' ? 'bg-red-500/20 text-red-300 border border-red-500/50' : 'bg-green-500/20 text-green-300 border border-green-500/50'
@@ -184,7 +227,8 @@ const Sell = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className={`space-y-6 ${!isVerified ? 'opacity-40 pointer-events-none' : ''}`}>
+          {/* ... existing form items ... */}
           {/* Main Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div>
@@ -300,25 +344,45 @@ const Sell = () => {
              </div>
            </div>
 
-          {/* Upload Images */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Account Images (Screenshots)</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          {/* Upload Images Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-black text-gray-400 uppercase tracking-widest">Account Gallery ({formData.images.length})</label>
+              <span className="text-[10px] text-gray-500 font-medium italic">First image will be the primary thumbnail</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {/* Existing Images */}
               {formData.images.map((url, index) => (
-                <div key={index} className="relative group aspect-video">
-                  <img src={url} className="w-full h-full object-cover rounded-lg border border-gray-700" alt={`Preview ${index}`} />
-                  <button 
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                  >
-                    <Plus className="w-4 h-4 rotate-45" />
-                  </button>
+                <div key={index} className="relative group aspect-square rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
+                  <img src={url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={`Preview ${index}`} />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button 
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="bg-red-500 text-white rounded-full p-2 shadow-xl hover:scale-110 active:scale-95 transition-all"
+                    >
+                      <Plus className="w-5 h-5 rotate-45" />
+                    </button>
+                  </div>
+                  {index === 0 && (
+                    <div className="absolute top-2 left-2 bg-primary text-white text-[9px] font-black uppercase px-2 py-1 rounded-md shadow-lg border border-white/20">
+                      Primary
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[9px] font-bold px-2 py-1 rounded-md backdrop-blur-md">
+                    #{index + 1}
+                  </div>
                 </div>
               ))}
-              <label className="cursor-pointer aspect-video flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-700 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group">
-                <Upload className="w-6 h-6 text-gray-500 group-hover:text-primary transition-colors" />
-                <span className="text-xs text-gray-500 group-hover:text-primary">Add Image</span>
+
+              {/* Upload Trigger */}
+              <label className="cursor-pointer aspect-square flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-800 bg-[#0a0c12]/50 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all group overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="w-10 h-10 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center group-hover:scale-110 transition-transform relative z-10">
+                  <Upload className="w-5 h-5 text-gray-500 group-hover:text-primary transition-colors" />
+                </div>
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest relative z-10 group-hover:text-primary transition-colors">Add Image</span>
                 <input
                   type="file"
                   className="hidden"
@@ -329,6 +393,13 @@ const Sell = () => {
                 />
               </label>
             </div>
+            
+            {loading && (
+              <div className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                 <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                 <span className="text-xs font-bold text-primary italic">Uploading high-quality assets...</span>
+              </div>
+            )}
           </div>
 
           {/* Description */}
@@ -349,10 +420,10 @@ const Sell = () => {
           <div className="pt-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isVerified}
               className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none transition-all disabled:opacity-50"
             >
-              {loading ? 'Processing...' : 'Post Listing'}
+              {loading ? 'Processing...' : (isVerified ? 'Post Listing' : 'Verification Pending')}
             </button>
           </div>
         </form>

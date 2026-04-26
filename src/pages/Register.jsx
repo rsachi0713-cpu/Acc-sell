@@ -9,7 +9,8 @@ const Register = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'buyer' // default role
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,6 +19,10 @@ const Register = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const setRole = (role) => {
+    setFormData({ ...formData, role });
   };
 
   const handleSubmit = async (e) => {
@@ -36,6 +41,7 @@ const Register = () => {
       options: {
         data: {
           full_name: formData.name,
+          role: formData.role
         },
         emailRedirectTo: window.location.origin
       }
@@ -45,11 +51,26 @@ const Register = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      setSuccess("Account created successfully! Please check your email and click the confirmation link before signing in.");
-      setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+      // Create profile record if user created
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            { id: data.user.id, full_name: formData.name, email: formData.email, role: formData.role }
+          ]);
+        
+        if (profileError) console.error('Profile creation error:', profileError);
+      }
+
+      setSuccess("Account created successfully! Redirecting to your dashboard...");
+      setFormData({ name: '', email: '', password: '', confirmPassword: '', role: 'buyer' });
       setTimeout(() => {
-        navigate('/login');
-      }, 4000);
+        if (formData.role === 'seller') {
+          navigate('/dashboard');
+        } else {
+          navigate('/profile');
+        }
+      }, 2000);
     }
   };
 
@@ -98,6 +119,37 @@ const Register = () => {
 
           {error && <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">{error}</div>}
           {success && <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm text-center">{success}</div>}
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-3 text-center">Account Type</label>
+            <div className="flex p-1 bg-[#0f111a] rounded-xl border border-gray-700/50">
+              <button
+                type="button"
+                onClick={() => setRole('buyer')}
+                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                  formData.role === 'buyer' 
+                  ? 'bg-primary text-white shadow-lg' 
+                  : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Buyer
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('seller')}
+                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                  formData.role === 'seller' 
+                  ? 'bg-primary text-white shadow-lg' 
+                  : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Seller
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 text-center mt-2 uppercase tracking-widest font-bold">
+              {formData.role === 'buyer' ? 'I want to browse and buy accounts' : 'I want to list and sell accounts'}
+            </p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const Login = () => {
+  const [searchParams] = useSearchParams();
+  const isAdminLogin = searchParams.get('admin') === 'true';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,18 +20,39 @@ const Login = () => {
     setSuccess('');
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
-    if (error) {
-      setError(error.message);
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
     } else {
-      setSuccess("Successfully logged in! Redirecting...");
+      // Fetch profile to check role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      const userRole = profile?.role || data.user?.user_metadata?.role || 'buyer';
+      
+      if (isAdminLogin && userRole !== 'admin') {
+        setError("Unauthorized: Admin access required.");
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(`Successfully logged in as ${userRole}! Redirecting...`);
       setTimeout(() => {
-        navigate('/');
+        if (userRole === 'admin') {
+          navigate('/admin');
+        } else if (userRole === 'seller') {
+          navigate('/dashboard');
+        } else {
+          navigate('/');
+        }
       }, 1000);
     }
   };
@@ -69,7 +92,9 @@ const Login = () => {
             <p className="text-gray-400">Sign in to your AccMarket account</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          {!isAdminLogin && (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-6">
             <button className="flex items-center justify-center gap-2 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 p-2.5 rounded-lg text-sm text-white transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -95,6 +120,8 @@ const Login = () => {
               <span className="px-2 bg-card text-gray-500">Or continue with</span>
             </div>
           </div>
+          </>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">
@@ -110,6 +137,20 @@ const Login = () => {
             </div>
           )}
           {success && <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-200 text-sm text-center">{success}</div>}
+
+          <div className="mb-6">
+            <div className="flex p-1 bg-[#0f111a] rounded-xl border border-gray-700/50">
+              <button
+                type="button"
+                className="flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-primary text-white shadow-lg"
+              >
+                Sign In
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 text-center mt-2 uppercase tracking-widest font-bold">
+              Access your digital assets dashboard
+            </p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -170,12 +211,14 @@ const Login = () => {
             </button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-gray-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-primary hover:text-primary-hover transition-colors">
-              Sign up today
-            </Link>
-          </p>
+          {!isAdminLogin && (
+            <p className="mt-8 text-center text-sm text-gray-400">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-medium text-primary hover:text-primary-hover transition-colors">
+                Sign up today
+              </Link>
+            </p>
+          )}
         </div>
       </motion.div>
     </div>

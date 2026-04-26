@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Filter, ChevronDown, CheckCircle2, ShieldCheck, Gamepad2, Star } from 'lucide-react';
 import AccountCard from '../components/AccountCard';
@@ -45,7 +45,27 @@ const mainPlatforms = [
 ];
 
 const Home = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Redirect Sellers to their dashboard
+  useEffect(() => {
+    const checkRedirect = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.role === 'seller') {
+          navigate('/dashboard');
+        }
+      }
+    };
+    checkRedirect();
+  }, [navigate]);
   const urlPlatform = searchParams.get('platform') || 'games';
 
   const [activePlatform, setActivePlatform] = useState(urlPlatform);
