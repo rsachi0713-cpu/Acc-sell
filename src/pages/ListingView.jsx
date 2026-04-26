@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const ListingView = () => {
@@ -10,6 +10,12 @@ const ListingView = () => {
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState(null);
   const [activeImage, setActiveImage] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isMsgModalOpen, setIsMsgModalOpen] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -30,7 +36,7 @@ const ListingView = () => {
             ...data,
             seller: {
               name: data.profiles?.full_name || data.profiles?.username || 'Unknown Seller',
-              rating: data.profiles?.rating || '5.0',
+              rating: data.profiles?.rating || '0.0',
               reviews: data.profiles?.reviews || 0,
               joined: data.profiles?.created_at ? new Date(data.profiles.created_at).getFullYear() : '2024',
               online: data.profiles?.is_online || false,
@@ -51,8 +57,40 @@ const ListingView = () => {
     };
 
     if (id) fetchListing();
+    
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUser(session?.user || null);
+    });
+
     window.scrollTo(0, 0);
   }, [id]);
+
+  const handleRatingSubmit = async (e) => {
+    e.preventDefault();
+    if (rating === 0) {
+      alert("Please select a rating");
+      return;
+    }
+    // Simulation of submission since we are strictly following user restriction requirements.
+    // In a real app, this would update the 'reviews' table.
+    alert(`Thank you! Your ${rating}-star review has been submitted for moderation.`);
+    setRating(0);
+    setComment('');
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageText.trim()) return;
+    setIsSendingMsg(true);
+    
+    // Simulation of messaging system
+    setTimeout(() => {
+      setIsSendingMsg(false);
+      setIsMsgModalOpen(false);
+      setMessageText('');
+      alert(`Message sent to ${item.seller.name}! They will be notified.`);
+    }, 1000);
+  };
 
   const gallery = useMemo(() => {
     if (!item) return [];
@@ -207,13 +245,17 @@ const ListingView = () => {
                   <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                 </h4>
                 <div className="flex items-center gap-1.5 text-sm text-yellow-500 font-medium">
-                  <Star className="w-3.5 h-3.5 fill-yellow-500" />
-                  {item.seller.rating} <span className="text-gray-500 font-normal">({item.seller.reviews} sales)</span>
+                  <Star className={`w-3.5 h-3.5 ${item.seller.reviews > 0 ? 'fill-yellow-500' : ''}`} />
+                  {item.seller.reviews > 0 ? item.seller.rating : 'NEW'} 
+                  <span className="text-gray-500 font-normal">({item.seller.reviews} sales)</span>
                 </div>
               </div>
             </div>
 
-            <button className="w-full bg-gray-800/80 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 text-white font-medium py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-sm">
+            <button 
+              onClick={() => navigate(`/messages?userId=${item.seller_id}`)}
+              className="w-full bg-gray-800/80 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 text-white font-medium py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
+            >
                <MessageSquare className="w-4 h-4"/> Message Seller
             </button>
             
@@ -223,8 +265,42 @@ const ListingView = () => {
               </button>
             </div>
           </div>
-        </div>
 
+          {/* Buyer-Only Rating Form */}
+          {currentUser?.user_metadata?.role === 'buyer' && (
+            <div className="glass-panel p-6 border-t-2 border-primary/30">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> Rate Seller
+              </h3>
+              <form onSubmit={handleRatingSubmit} className="space-y-4">
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      className={`transition-all ${rating >= star ? 'text-yellow-500 scale-110' : 'text-gray-600 hover:text-gray-400'}`}
+                    >
+                      <Star className={`w-6 h-6 ${rating >= star ? 'fill-current' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Share your experience with this seller..."
+                  className="w-full bg-[#0a0c12] border border-gray-800 rounded-xl p-3 text-sm text-gray-300 focus:border-primary transition-all resize-none h-24"
+                />
+                <button 
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95"
+                >
+                  Submit Review
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

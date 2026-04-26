@@ -10,6 +10,7 @@ const Register = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    whatsapp: '',
     role: 'buyer' // default role
   });
   const [loading, setLoading] = useState(false);
@@ -41,7 +42,8 @@ const Register = () => {
       options: {
         data: {
           full_name: formData.name,
-          role: formData.role
+          role: formData.role,
+          whatsapp: formData.whatsapp
         },
         emailRedirectTo: window.location.origin
       }
@@ -56,7 +58,7 @@ const Register = () => {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
-            { id: data.user.id, full_name: formData.name, email: formData.email, role: formData.role }
+            { id: data.user.id, full_name: formData.name, email: formData.email, role: formData.role, whatsapp: formData.whatsapp }
           ]);
         
         if (profileError) console.error('Profile creation error:', profileError);
@@ -223,6 +225,31 @@ const Register = () => {
                 />
               </div>
             </div>
+            
+            {formData.role === 'seller' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="overflow-hidden"
+              >
+                <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp Number</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 font-bold text-xs">+</span>
+                  </div>
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    value={formData.whatsapp}
+                    onChange={handleChange}
+                    className="block w-full pl-10 pr-3 py-2.5 bg-[#0f111a] border border-gray-700/50 rounded-lg focus:ring-primary focus:border-primary text-gray-200 placeholder-gray-500 transition-colors"
+                    placeholder="94771234567"
+                    required
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Required for sellers (e.g. 94771234567)</p>
+              </motion.div>
+            )}
 
             <div className="flex items-start mt-2">
               <input

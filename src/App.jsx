@@ -9,6 +9,7 @@ import ListingView from './pages/ListingView';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
+import Messages from './pages/Messages';
 import Header from './components/Header';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/listing/:id" element={<ListingView />} />
           </Routes>

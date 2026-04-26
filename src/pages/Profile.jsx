@@ -289,6 +289,9 @@ const Profile = () => {
           
 
 
+          <button type="button" onClick={() => navigate('/messages')} className="w-full mt-6 bg-primary/10 text-primary py-2.5 rounded-lg font-bold hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
+            <MessageSquare className="w-4 h-4" /> My Messages
+          </button>
           <button type="button" onClick={handleLogout} className="w-full mt-4 bg-gray-800/50 text-red-400 py-2.5 rounded-lg font-medium hover:bg-gray-800">Logout</button>
         </div>
       </div>

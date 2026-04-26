@@ -39,9 +39,10 @@ const AccountCard = ({ account }) => {
               {account.seller.name}
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-yellow-400 font-medium bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
-            <Star className="w-3 h-3 fill-current" />
-            {account.seller.rating} <span className="text-gray-300">({account.seller.reviews})</span>
+          <div className="flex items-center gap-1 text-[10px] text-yellow-400 font-black bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-white/5">
+            <Star className={`w-3 h-3 ${account.seller.reviews > 0 ? 'fill-current' : ''}`} />
+            {account.seller.reviews > 0 ? account.seller.rating : 'NEW'} 
+            <span className="text-gray-400 font-bold ml-1">({account.seller.reviews})</span>
           </div>
         </div>
       </div>

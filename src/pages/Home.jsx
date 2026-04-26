@@ -91,7 +91,7 @@ const Home = () => {
           seller: {
             name: item.profiles?.full_name || item.profiles?.username || 'Unknown Seller',
             avatar: item.profiles?.avatar_url,
-            rating: item.profiles?.rating || '5.0',
+            rating: item.profiles?.rating || '0.0',
             reviews: item.profiles?.reviews || 0,
             online: item.profiles?.is_online || false
           }
