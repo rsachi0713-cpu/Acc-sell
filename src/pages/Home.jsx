@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Filter, ChevronDown, CheckCircle2, ShieldCheck, Gamepad2, Star } from 'lucide-react';
+import { Filter, ChevronDown, CheckCircle2, ShieldCheck, Gamepad2, Star, Search } from 'lucide-react';
 import AccountCard from '../components/AccountCard';
 import { supabase } from '../supabaseClient';
 
@@ -138,7 +138,17 @@ const Home = () => {
   }, [listings, activePlatform]);
 
   const displayedAccounts = useMemo(() => {
+    const searchQuery = searchParams.get('search')?.toLowerCase() || '';
+
     return listings.filter(acc => {
+      // Search filter
+      const searchMatch = searchQuery ? (
+        acc.title?.toLowerCase().includes(searchQuery) ||
+        acc.description?.toLowerCase().includes(searchQuery) ||
+        acc.platform?.toLowerCase().includes(searchQuery) ||
+        acc.subcategory?.toLowerCase().includes(searchQuery)
+      ) : true;
+
       // Platform filter
       const platformMatch = acc.platform === activePlatform;
       
@@ -151,20 +161,21 @@ const Home = () => {
       // Online filter
       const onlineMatch = onlineOnly ? acc.seller.online : true;
       
-      return platformMatch && subMatch && onlineMatch;
+      return searchMatch && platformMatch && subMatch && onlineMatch;
     });
-  }, [listings, activePlatform, activeTab, onlineOnly]);
+  }, [listings, activePlatform, activeTab, onlineOnly, searchParams]);
 
   return (
     <div className="pb-20">
       {/* Banner Section */}
-      <div className="relative h-[250px] sm:h-[300px] w-full bg-gray-900 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/40 to-purple-900/40 mix-blend-multiply"></div>
-        {/* Placeholder for Game Banner */}
+      <div className="relative h-[250px] sm:h-[300px] w-full bg-[#0d1117] overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/40 to-purple-900/40 mix-blend-multiply border-b border-gray-800"></div>
+        {/* Optimized Game Banner */}
         <img 
-          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
+          src="https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=60" 
           alt="Game Banner" 
-          className="w-full h-full object-cover opacity-60"
+          className="w-full h-full object-cover opacity-50 transition-opacity duration-1000"
+          onLoad={(e) => e.target.style.opacity = 0.6}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
         
@@ -245,6 +256,28 @@ const Home = () => {
             </button>
           </div>
         </div>
+
+        {/* Search Results Indicator */}
+        {searchParams.get('search') && (
+          <div className="mb-6 flex items-center justify-between bg-primary/10 border border-primary/20 p-4 rounded-xl">
+             <div className="flex items-center gap-2">
+               <Search className="w-4 h-4 text-primary" />
+               <span className="text-sm font-bold text-white">
+                 Search results for: <span className="text-primary italic">"{searchParams.get('search')}"</span>
+               </span>
+             </div>
+             <button 
+               onClick={() => {
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('search');
+                  setSearchParams(newParams);
+               }}
+               className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+             >
+               Clear Search
+             </button>
+          </div>
+        )}
 
         {/* Account Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">

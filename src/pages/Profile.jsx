@@ -18,6 +18,7 @@ const Profile = () => {
   const [myListings, setMyListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [editingListing, setEditingListing] = useState(null);
+  const [activeTab, setActiveTab] = useState('history');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,9 +31,11 @@ const Profile = () => {
       setUser(session.user);
       const fetchedFullName = session.user.user_metadata?.full_name || '';
       const fetchedAvatarUrl = session.user.user_metadata?.avatar_url || '';
+      const fetchedRole = session.user.user_metadata?.role || 'buyer';
       
       setFullName(fetchedFullName);
       setAvatarUrl(fetchedAvatarUrl);
+      setRole(fetchedRole);
       setInitialData({ fullName: fetchedFullName, avatarUrl: fetchedAvatarUrl });
       setLoading(false);
     };
@@ -284,20 +287,7 @@ const Profile = () => {
             <button type="submit" disabled={saving} className="w-full bg-primary py-2.5 rounded-lg text-white font-bold hover:bg-primary-hover transition-all">Save Changes</button>
           </form>
           
-          <div className="mt-6 pt-6 border-t border-gray-800">
-            <p className="text-[10px] font-bold text-gray-500 uppercase mb-3">Account Mode</p>
-            <button 
-              onClick={handleSwitchRole}
-              disabled={saving}
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold transition-all border ${
-                role === 'seller' 
-                ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20' 
-                : 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
-              }`}
-            >
-              {role === 'seller' ? (<><ShoppingBag className="w-4 h-4"/> Switch to Buyer Mode</>) : (<><Cpu className="w-4 h-4"/> Switch to Seller Mode</>)}
-            </button>
-          </div>
+
 
           <button type="button" onClick={handleLogout} className="w-full mt-4 bg-gray-800/50 text-red-400 py-2.5 rounded-lg font-medium hover:bg-gray-800">Logout</button>
         </div>
@@ -306,64 +296,64 @@ const Profile = () => {
       {/* Main Content - Activity/Listings */}
       <div className="md:col-span-2">
         <h2 className="text-2xl font-bold text-white mb-6">{role === 'seller' ? 'Seller Dashboard' : 'My Account'}</h2>
-        <div className="space-y-4">
-          <div className="flex gap-4 mb-8">
-            <div className="flex-1 glass-panel p-4 text-center">
-              <div className="text-2xl font-bold text-white text-primary">{role === 'seller' ? myListings.length : 0}</div>
-              <div className="text-xs text-gray-500 uppercase font-bold">{role === 'seller' ? 'Listings' : 'Orders'}</div>
-            </div>
-            <div className="flex-1 glass-panel p-4 text-center">
-              <div className="text-2xl font-bold text-white text-primary">0</div>
-              <div className="text-xs text-gray-500 uppercase font-bold">{role === 'seller' ? 'Sales' : 'Favorites'}</div>
-            </div>
+        <div className="space-y-6">
+          {/* Tabs Navigation */}
+          <div className="flex border-b border-gray-800 gap-8">
+            <button 
+              onClick={() => setActiveTab('history')}
+              className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
+                activeTab === 'history' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Purchase History
+              {activeTab === 'history' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
+            </button>
+            <button 
+              onClick={() => setActiveTab('cart')}
+              className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
+                activeTab === 'cart' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Order Cart
+              {activeTab === 'cart' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
+            </button>
           </div>
 
-          {role === 'seller' ? (
-            <>
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2 mb-4">
-                <h3 className="text-lg font-bold text-white">Your Posters</h3>
-                <button onClick={() => navigate('/sell')} className="text-primary text-sm font-bold">+ New Listing</button>
-              </div>
-
-              {listingsLoading ? (
-                <div className="text-gray-500">Loading...</div>
-              ) : myListings.length === 0 ? (
-                <div className="text-gray-500">No listings yet.</div>
-              ) : (
-                <div className="grid gap-4">
-                  {myListings.map(listing => (
-                    <div key={listing.id} className="glass-panel p-4 flex gap-4 items-center group">
-                      <img src={listing.thumbnail} className="w-20 h-14 object-cover rounded-lg shadow-xl" alt="" />
-                      <div className="flex-1">
-                        <h4 className="text-white font-semibold truncate">{listing.title}</h4>
-                        <p className="text-primary font-bold text-sm leading-none mt-1">Rs. {listing.price}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingListing(listing)} className="p-2 hover:bg-primary/20 rounded-lg text-gray-400 hover:text-primary transition-colors">
-                          <Edit2 className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => handleDeleteListing(listing.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors">
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+          <div className="min-h-[400px]">
+            {activeTab === 'history' ? (
+              <div className="glass-panel p-12 text-center bg-gray-800/10">
+                <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700 shadow-xl">
+                   <Clock className="w-10 h-10 text-gray-500" />
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="glass-panel p-12 text-center">
-              <ShoppingBag className="w-16 h-16 text-gray-700 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">No Orders Yet</h3>
-              <p className="text-gray-500 max-w-xs mx-auto mb-6">You haven't purchased any digital assets yet. Browse our marketplace to find premium accounts.</p>
-              <button 
-                onClick={() => navigate('/')} 
-                className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary/20"
-              >
-                Start Shopping
-              </button>
-            </div>
-          )}
+                <h3 className="text-xl font-bold text-white mb-2">No Purchase History</h3>
+                <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                  You haven't bought any accounts yet. Once you make a purchase, your order details and account credentials will appear here.
+                </p>
+                <button 
+                  onClick={() => navigate('/')} 
+                  className="bg-primary hover:bg-primary-hover text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all flex items-center gap-3 mx-auto active:scale-95"
+                >
+                  Browse Marketplace
+                </button>
+              </div>
+            ) : (
+              <div className="glass-panel p-12 text-center bg-gray-800/10">
+                <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700 shadow-xl">
+                   <ShoppingBag className="w-10 h-10 text-gray-500" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Your Cart is Empty</h3>
+                <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                  Looks like you haven't added anything to your cart yet. Find the best gaming and social media accounts at AccMarket.gg
+                </p>
+                <button 
+                  onClick={() => navigate('/')} 
+                  className="bg-primary hover:bg-primary-hover text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all flex items-center gap-3 mx-auto active:scale-95"
+                >
+                  Start Shopping
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

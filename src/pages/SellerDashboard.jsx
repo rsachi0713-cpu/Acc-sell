@@ -58,6 +58,11 @@ const SellerDashboard = () => {
         
         setUser(session.user);
         setRole(metadataRole);
+        
+        if (metadataRole === 'buyer') {
+          navigate('/profile');
+          return;
+        }
         setFullName(session.user.user_metadata?.full_name || '');
         setAvatarUrl(session.user.user_metadata?.avatar_url || '');
         
@@ -247,7 +252,7 @@ const SellerDashboard = () => {
                   try {
                     setLoading(true);
                     const fileExt = file.name.split('.').pop();
-                    const fileName = `${userId}-${Date.now()}.${fileExt}`;
+                    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
                     
                     const { error: uploadError } = await supabase.storage
                       .from('avatars')
@@ -261,7 +266,7 @@ const SellerDashboard = () => {
                     const { error: updateError } = await supabase
                       .from('profiles')
                       .update({ avatar_url: newUrl })
-                      .eq('id', userId);
+                      .eq('id', user.id);
 
                     if (updateError) throw updateError;
                     setAvatarUrl(newUrl);

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Globe, ChevronDown, User as UserIcon, LogIn, Menu, Plus, ShieldCheck, LogOut } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const Header = () => {
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
   const { pathname } = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const isAdminContext = pathname.includes('admin') || searchParams.get('admin') === 'true';
@@ -57,6 +59,13 @@ const Header = () => {
               <Search className="w-4 h-4 text-gray-500 mr-2 shrink-0" />
               <input 
                 type="text" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchTerm.trim()) {
+                    navigate(`/?search=${encodeURIComponent(searchTerm.trim())}`);
+                  }
+                }}
                 placeholder="Search offers, accounts, items..." 
                 className="w-full h-full bg-transparent text-sm focus:outline-none text-gray-200 placeholder-gray-500"
               />
@@ -80,7 +89,7 @@ const Header = () => {
           {user ? (
             <div className="flex items-center gap-3">
               <Link 
-                to={user.user_metadata?.role === 'admin' ? "/admin" : "/dashboard"} 
+                to={user.user_metadata?.role === 'admin' ? "/admin" : (user.user_metadata?.role === 'seller' ? "/dashboard" : "/profile")} 
                 className={`flex items-center gap-3 p-1 pr-4 rounded-full transition-all border border-gray-700/50 hover:border-primary/50 bg-gray-800/20 group`}
               >
                 <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-700 group-hover:border-primary/50 transition-colors shadow-lg">
