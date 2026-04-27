@@ -20,7 +20,12 @@ import {
   Upload,
   User,
   Phone,
-  Mail
+  Mail,
+  CreditCard,
+  Plus as PlusIcon,
+  Trash2 as TrashIcon,
+  Banknote,
+  Wallet
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useCurrency } from '../context/CurrencyContext';
@@ -47,6 +52,7 @@ const SellerDashboard = () => {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -75,13 +81,14 @@ const SellerDashboard = () => {
         setAvatarUrl(session.user.user_metadata?.avatar_url || '');
         
         // Fetch full profile info
-        const { data: profileData } = await supabase.from('profiles').select('is_verified, full_name, avatar_url, whatsapp').eq('id', userId).single();
+        const { data: profileData } = await supabase.from('profiles').select('is_verified, full_name, avatar_url, whatsapp, payment_methods').eq('id', userId).single();
         
         if (profileData) {
           setIsVerified(profileData.is_verified || false);
           if (profileData.full_name) setFullName(profileData.full_name);
           if (profileData.whatsapp) setWhatsapp(profileData.whatsapp);
           if (profileData.avatar_url) setAvatarUrl(profileData.avatar_url);
+          if (profileData.payment_methods) setPaymentMethods(profileData.payment_methods || []);
         }
         
         await fetchDashboardData(userId);
@@ -125,7 +132,8 @@ const SellerDashboard = () => {
         .update({ 
           full_name: fullName, 
           whatsapp: whatsapp,
-          avatar_url: avatarUrl 
+          avatar_url: avatarUrl,
+          payment_methods: paymentMethods 
         })
         .eq('id', user.id);
 
@@ -135,7 +143,8 @@ const SellerDashboard = () => {
         data: { 
           full_name: fullName, 
           whatsapp: whatsapp,
-          avatar_url: avatarUrl 
+          avatar_url: avatarUrl,
+          payment_methods: paymentMethods
         }
       });
       
@@ -405,13 +414,26 @@ const SellerDashboard = () => {
                 {myListings.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {myListings.map(listing => (
-                      <div key={listing.id} className="bg-gray-800/40 border border-gray-800 p-4 rounded-2xl">
-                         <img src={listing.thumbnail} className="w-full h-40 object-cover rounded-xl mb-4" alt="" />
-                         <h4 className="text-white font-bold truncate mb-1">{listing.title}</h4>
-                         <p className="text-primary font-bold text-sm mb-4">{formatPrice(listing.price)}</p>
-                         <div className="flex gap-2">
-                            <button className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-xs font-bold">Edit</button>
-                            <button onClick={() => handleDeleteListing(listing.id)} className="p-2 bg-red-500/10 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                      <div key={listing.id} className="bg-gray-800/40 border border-gray-800 rounded-2xl overflow-hidden group hover:border-gray-700 transition-all">
+                         <div className="relative cursor-pointer" onClick={() => navigate(`/listing/${listing.id}`)}>
+                           <img src={listing.thumbnail} className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300" alt="" />
+                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <span className="text-white text-xs font-black uppercase tracking-widest bg-primary/90 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                               <Eye className="w-3.5 h-3.5" /> View Listing
+                             </span>
+                           </div>
+                         </div>
+                         <div className="p-4">
+                           <h4 onClick={() => navigate(`/listing/${listing.id}`)} className="text-white font-bold truncate mb-1 cursor-pointer hover:text-primary transition-colors">{listing.title}</h4>
+                           <p className="text-primary font-bold text-sm mb-4">{formatPrice(listing.price)}</p>
+                           <div className="flex gap-2">
+                              <button onClick={() => navigate(`/listing/${listing.id}`)} className="flex-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all">
+                                <Eye className="w-3.5 h-3.5" /> View
+                              </button>
+                              <button onClick={() => handleDeleteListing(listing.id)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                           </div>
                          </div>
                       </div>
                     ))}
@@ -477,6 +499,154 @@ const SellerDashboard = () => {
                       {loading ? 'Saving...' : 'Update Settings'}
                     </button>
                   </form>
+                </div>
+
+                <div className="glass-panel p-8 mt-6">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Payment Details</h2>
+                      <p className="text-xs text-gray-500 mt-1">Add your bank or wallet details for payouts</p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setPaymentMethods([...paymentMethods, { id: Date.now(), method: '', details: '' }])}
+                      className="p-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-all"
+                    >
+                      <PlusIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {paymentMethods.length === 0 && (
+                      <div className="text-center py-10 bg-[#0a0c10]/50 rounded-2xl border-2 border-dashed border-gray-800">
+                        <CreditCard className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                        <p className="text-sm text-gray-600">No payment methods added yet.</p>
+                      </div>
+                    )}
+                    
+                    {paymentMethods.map((pm, idx) => (
+                      <div key={pm.id} className="bg-[#0a0c10] border border-gray-800 p-4 rounded-xl flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2 text-white font-bold text-sm">
+                             <Banknote className="w-4 h-4 text-primary" /> Method #{idx + 1}
+                           </div>
+                           <button 
+                             type="button" 
+                             onClick={() => setPaymentMethods(paymentMethods.filter(p => p.id !== pm.id))}
+                             className="text-red-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-all"
+                           >
+                             <TrashIcon className="w-4 h-4" />
+                           </button>
+                        </div>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">Payment Method</label>
+                            <select 
+                              value={pm.method}
+                              onChange={(e) => {
+                                const newMethods = [...paymentMethods];
+                                newMethods[idx].method = e.target.value;
+                                setPaymentMethods(newMethods);
+                              }}
+                              className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:border-primary outline-none appearance-none"
+                            >
+                              <option value="" disabled>Select Method</option>
+                              <option value="Bank">Bank Transfer</option>
+                              <option value="EzCash">EzCash</option>
+                            </select>
+                          </div>
+
+                          {pm.method === 'Bank' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">Bank Name</label>
+                                <input 
+                                  type="text"
+                                  value={pm.bankName || ''}
+                                  placeholder="e.g. Bank of Ceylon"
+                                  onChange={(e) => {
+                                    const newMethods = [...paymentMethods];
+                                    newMethods[idx].bankName = e.target.value;
+                                    setPaymentMethods(newMethods);
+                                  }}
+                                  className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">Account Number</label>
+                                <input 
+                                  type="text"
+                                  value={pm.accountNo || ''}
+                                  placeholder="0000000000"
+                                  onChange={(e) => {
+                                    const newMethods = [...paymentMethods];
+                                    newMethods[idx].accountNo = e.target.value;
+                                    setPaymentMethods(newMethods);
+                                  }}
+                                  className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">Branch</label>
+                                <input 
+                                  type="text"
+                                  value={pm.branch || ''}
+                                  placeholder="e.g. Pettah"
+                                  onChange={(e) => {
+                                    const newMethods = [...paymentMethods];
+                                    newMethods[idx].branch = e.target.value;
+                                    setPaymentMethods(newMethods);
+                                  }}
+                                  className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">Account Holder Name</label>
+                                <input 
+                                  type="text"
+                                  value={pm.accountName || ''}
+                                  placeholder="John Doe"
+                                  onChange={(e) => {
+                                    const newMethods = [...paymentMethods];
+                                    newMethods[idx].accountName = e.target.value;
+                                    setPaymentMethods(newMethods);
+                                  }}
+                                  className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {pm.method === 'EzCash' && (
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-gray-600 mb-1.5 ml-1">EzCash Number</label>
+                              <input 
+                                type="tel"
+                                value={pm.ezCashNumber || ''}
+                                placeholder="077xxxxxxx"
+                                onChange={(e) => {
+                                  const newMethods = [...paymentMethods];
+                                  newMethods[idx].ezCashNumber = e.target.value;
+                                  setPaymentMethods(newMethods);
+                                }}
+                                className="w-full bg-[#11141b] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-primary outline-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {paymentMethods.length > 0 && (
+                    <button 
+                      onClick={handleUpdateProfile}
+                      disabled={loading}
+                      className="w-full mt-8 bg-primary hover:bg-primary-hover text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-all active:scale-95"
+                    >
+                      {loading ? 'Saving Payments...' : 'Save All Payment Details'}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
