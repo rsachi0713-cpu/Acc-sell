@@ -294,6 +294,23 @@ const SellerDashboard = () => {
                {message.text}
              </div>
           )}
+
+          {!isVerified && (
+            <div className="m-4 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/20 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Verification Required</h4>
+                  <p className="text-[11px] text-gray-500">Your account is currently under review. You cannot post new listings until verified.</p>
+                </div>
+              </div>
+              <div className="px-3 py-1 bg-orange-500/10 text-orange-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-orange-500/20">
+                Pending Approval
+              </div>
+            </div>
+          )}
           
           {/* Top Bar */}
           <header className="h-16 border-b border-gray-800 bg-[#0d0f17]/50 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10 shrink-0">
@@ -376,7 +393,10 @@ const SellerDashboard = () => {
               <div className="glass-panel p-6">
                 <div className="flex items-center justify-between mb-8">
                    <h2 className="text-2xl font-bold text-white">My Inventory</h2>
-                   <button onClick={() => navigate('/sell')} className="px-4 py-2 bg-primary text-white rounded-lg font-bold text-sm hover:scale-105 transition-all">
+                   <button 
+                     onClick={() => isVerified ? navigate('/sell') : alert('Your account must be verified before listing items.')} 
+                     className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${isVerified ? 'bg-primary text-white hover:scale-105' : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'}`}
+                   >
                      + New Listing
                    </button>
                 </div>

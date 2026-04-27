@@ -346,7 +346,7 @@ const Profile = () => {
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Your Cart is Empty</h3>
                 <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                  Looks like you haven't added anything to your cart yet. Find the best gaming and social media accounts at AccMarket.gg
+                  Looks like you haven't added anything to your cart yet. Find the best gaming and social media accounts at Acc Zone
                 </p>
                 <button 
                   onClick={() => navigate('/')} 

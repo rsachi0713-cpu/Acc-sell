@@ -145,6 +145,12 @@ const Sell = () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
 
+    if (!isVerified) {
+      setMessage({ text: 'Access Denied: Your account must be verified by an admin before you can post listings.', type: 'error' });
+      setLoading(false);
+      return;
+    }
+
     try {
       // Assuming a 'listings' table exists in Supabase.
       const { error } = await supabase.from('listings').insert([

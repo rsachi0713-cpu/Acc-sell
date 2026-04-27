@@ -171,7 +171,7 @@ const Messages = () => {
 
       setContacts(profilesToShow.map(p => ({
         id: p.id,
-        name: p.full_name || 'AccMarket User',
+        name: p.full_name || 'Acc Zone User',
         avatar: p.avatar_url,
         lastMsg: 'Click to start chatting',
         time: '',
@@ -337,9 +337,9 @@ const Messages = () => {
             <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
                <Globe className="w-12 h-12 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">AccMarket Web</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Acc Zone Web</h2>
             <p className="text-gray-500 text-center max-w-md px-6">
-              Send and receive messages without keeping your phone online. Use AccMarket on up to 4 linked devices and 1 phone at the same time.
+              Send and receive messages without keeping your phone online. Use Acc Zone on up to 4 linked devices and 1 phone at the same time.
             </p>
             <div className="mt-12 flex items-center gap-2 text-xs text-gray-600 font-bold uppercase tracking-widest border-t border-gray-800 pt-8 w-full justify-center">
                <CheckCheck className="w-4 h-4" /> End-to-end encrypted

@@ -89,7 +89,7 @@ const Login = () => {
         <div className="glass-panel p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-            <p className="text-gray-400">Sign in to your AccMarket account</p>
+            <p className="text-gray-400">Sign in to your Acc Zone account</p>
           </div>
 
           {!isAdminLogin && (

@@ -33,7 +33,7 @@ const Header = () => {
             <Globe className="w-6 h-6 text-primary" />
           </div>
           <span className="text-xl font-bold tracking-tight text-white hidden sm:block">
-            AccMarket<span className="text-primary">.gg</span>
+            Acc<span className="text-primary"> Zone</span>
           </span>
         </div>
 

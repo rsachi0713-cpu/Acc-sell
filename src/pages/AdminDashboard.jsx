@@ -27,6 +27,7 @@ const AdminDashboard = () => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all'); // all, seller, buyer
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -345,10 +346,30 @@ const AdminDashboard = () => {
                   exit={{ opacity: 0, x: -20 }}
                   className="glass-panel border-slate-800/50 overflow-hidden"
                 >
+                  <div className="flex items-center gap-4 px-10 py-6 border-b border-slate-800/30">
+                    <button 
+                      onClick={() => setUserRoleFilter('all')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${userRoleFilter === 'all' ? 'bg-primary text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      All Users
+                    </button>
+                    <button 
+                      onClick={() => setUserRoleFilter('seller')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${userRoleFilter === 'seller' ? 'bg-primary text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      Sellers Only
+                    </button>
+                    <button 
+                      onClick={() => setUserRoleFilter('buyer')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${userRoleFilter === 'buyer' ? 'bg-primary text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      Buyers Only
+                    </button>
+                  </div>
                   <DataTable 
-                    title="User Management" 
+                    title={`${userRoleFilter === 'all' ? 'Total' : userRoleFilter.charAt(0).toUpperCase() + userRoleFilter.slice(1)} Management`} 
                     columns={['Identity', 'Access Level', 'Registration Key', 'Verified', 'Actions']}
-                    data={data.users}
+                    data={data.users.filter(u => userRoleFilter === 'all' || u.role === userRoleFilter)}
                     renderRow={(u) => (
                       <tr key={u.id} className="hover:bg-slate-800/30 transition-all group border-b border-slate-800/50 last:border-0">
                         <td className="px-8 py-5">
