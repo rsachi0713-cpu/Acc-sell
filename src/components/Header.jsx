@@ -97,14 +97,7 @@ const Header = () => {
 
           {user ? (
             <div className="flex items-center gap-3">
-              <Link 
-                to="/messages" 
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-all relative group"
-                title="Messages"
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full border-2 border-[#0a0c12] opacity-0 group-hover:opacity-100 transition-opacity"></span>
-              </Link>
+
               <Link 
                 to={user.user_metadata?.role === 'admin' ? "/admin" : (user.user_metadata?.role === 'seller' ? "/dashboard" : "/profile")} 
                 className={`flex items-center gap-3 p-1 pr-4 rounded-full transition-all border border-gray-700/50 hover:border-primary/50 bg-gray-800/20 group`}
