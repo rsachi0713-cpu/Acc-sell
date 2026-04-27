@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Globe, ChevronDown, User as UserIcon, LogIn, Menu, Plus, ShieldCheck, LogOut, MessageSquare } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Search, Globe, ChevronDown, User as UserIcon, LogIn, Menu, Plus, ShieldCheck, LogOut, MessageSquare, DollarSign } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Header = () => {
+  const { currency, setCurrency } = useCurrency();
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,10 +77,17 @@ const Header = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-3 md:gap-4 text-sm font-medium text-gray-300">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
-                <span className="text-xs font-bold text-gray-300">LKR</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-              </button>
+          <div className="relative group/curr">
+             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700/50">
+               <DollarSign className={`w-3.5 h-3.5 ${currency === 'USD' ? 'text-primary' : 'text-gray-500'}`} />
+               <span className="text-xs font-bold text-gray-300 uppercase shrink-0">{currency}</span>
+               <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+             </button>
+             <div className="absolute top-full right-0 mt-2 w-24 bg-[#0d0f17] border border-gray-800 rounded-xl overflow-hidden opacity-0 invisible group-hover/curr:opacity-100 group-hover/curr:visible transition-all z-50 shadow-2xl">
+                <button onClick={() => setCurrency('LKR')} className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-gray-800 transition-colors ${currency === 'LKR' ? 'text-primary bg-primary/5' : 'text-gray-400'}`}>LKR</button>
+                <button onClick={() => setCurrency('USD')} className={`w-full px-4 py-2.5 text-left text-xs font-bold hover:bg-gray-800 transition-colors ${currency === 'USD' ? 'text-primary bg-primary/5' : 'text-gray-400'}`}>USD</button>
+             </div>
+          </div>
           
           {user && user.user_metadata?.role === 'seller' && (
             <Link to="/sell" className="hidden md:flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 px-3 py-1.5 rounded-md text-sm transition-colors">

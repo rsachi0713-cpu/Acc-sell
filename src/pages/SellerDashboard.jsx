@@ -23,8 +23,10 @@ import {
   Mail
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useCurrency } from '../context/CurrencyContext';
 
 const SellerDashboard = () => {
+  const { formatPrice } = useCurrency();
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -339,7 +341,7 @@ const SellerDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                   <StatCard icon={<Package className="w-5 h-5 text-primary" />} label="Active Listings" value={stats.activeListings} trend="+0 new" />
                   <StatCard icon={<ShoppingBag className="w-5 h-5 text-emerald-500" />} label="Total Sales" value={stats.totalSales} trend="0%" />
-                  <StatCard icon={<DollarSign className="w-5 h-5 text-amber-500" />} label="Revenue" value={`Rs. ${stats.revenue}`} trend="Rs. 0" />
+                  <StatCard icon={<DollarSign className="w-5 h-5 text-amber-500" />} label="Revenue" value={formatPrice(stats.revenue)} trend={`${formatPrice(0)}`} />
                   <StatCard icon={<TrendingUp className="w-5 h-5 text-blue-500" />} label="Views" value={stats.views} trend="0" />
                 </div>
 
@@ -365,7 +367,7 @@ const SellerDashboard = () => {
                                 <img src={listing.thumbnail} className="w-10 h-10 rounded-lg object-cover border border-gray-800" alt="" />
                                 <span className="text-sm font-medium text-white">{listing.title}</span>
                               </td>
-                              <td className="py-4 text-sm font-bold text-white">Rs. {listing.price}</td>
+                              <td className="py-4 text-sm font-bold text-white">{formatPrice(listing.price)}</td>
                               <td className="py-4">
                                 <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-500 uppercase border border-green-500/20">Active</span>
                               </td>
@@ -406,7 +408,7 @@ const SellerDashboard = () => {
                       <div key={listing.id} className="bg-gray-800/40 border border-gray-800 p-4 rounded-2xl">
                          <img src={listing.thumbnail} className="w-full h-40 object-cover rounded-xl mb-4" alt="" />
                          <h4 className="text-white font-bold truncate mb-1">{listing.title}</h4>
-                         <p className="text-primary font-bold text-sm mb-4">Rs. {listing.price}</p>
+                         <p className="text-primary font-bold text-sm mb-4">{formatPrice(listing.price)}</p>
                          <div className="flex gap-2">
                             <button className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-xs font-bold">Edit</button>
                             <button onClick={() => handleDeleteListing(listing.id)} className="p-2 bg-red-500/10 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>

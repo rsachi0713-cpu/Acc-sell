@@ -140,7 +140,7 @@ const Home = () => {
   const displayedAccounts = useMemo(() => {
     const searchQuery = searchParams.get('search')?.toLowerCase() || '';
 
-    return listings.filter(acc => {
+    const filtered = listings.filter(acc => {
       // Search filter
       const searchMatch = searchQuery ? (
         acc.title?.toLowerCase().includes(searchQuery) ||
@@ -158,11 +158,18 @@ const Home = () => {
         subMatch = acc.subcategory === activeTab;
       }
       
-      // Online filter
-      const onlineMatch = onlineOnly ? acc.seller.online : true;
-      
-      return searchMatch && platformMatch && subMatch && onlineMatch;
+      return searchMatch && platformMatch && subMatch;
     });
+
+    // If onlineOnly is active, sort online sellers to the top
+    if (onlineOnly) {
+      return [...filtered].sort((a, b) => {
+        if (a.seller.online === b.seller.online) return 0;
+        return a.seller.online ? -1 : 1;
+      });
+    }
+
+    return filtered;
   }, [listings, activePlatform, activeTab, onlineOnly, searchParams]);
 
   return (

@@ -1,8 +1,11 @@
 import React from 'react';
 import { Star, ShieldCheck, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useCurrency } from '../context/CurrencyContext';
 
 const AccountCard = ({ account }) => {
+  const { formatPrice } = useCurrency();
+
   return (
     <Link to={`/listing/${account.id}`} className="group glass-panel overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col h-full bg-[#181c2e] border border-gray-800 block">
       
@@ -71,7 +74,7 @@ const AccountCard = ({ account }) => {
         {/* Footer */}
         <div className="pt-3 border-t border-gray-800/80 flex items-center justify-between mt-auto bg-[#131624] -mx-4 -mb-4 px-4 py-3">
           <div className="text-lg font-bold text-white">
-            Rs. {account.price}
+            {formatPrice(account.price)}
           </div>
           <div className="w-8 h-8 rounded-lg bg-gray-800/80 flex items-center justify-center group-hover:bg-primary transition-colors cursor-pointer">
             <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-white" />

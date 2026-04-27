@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useCurrency } from '../context/CurrencyContext';
 
 const ListingView = () => {
+  const { formatPrice } = useCurrency();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -202,7 +204,7 @@ const ListingView = () => {
             <div className="flex items-baseline justify-between mb-6 border-b border-gray-800 pb-6">
               <span className="text-gray-400 text-sm">Price</span>
               <div className="text-right">
-                <div className="text-3xl font-extrabold text-white">Rs. {item.price}</div>
+                <div className="text-3xl font-extrabold text-white">{formatPrice(item.price)}</div>
                 <div className="text-primary text-xs font-bold mt-1">Verified Listing</div>
               </div>
             </div>
