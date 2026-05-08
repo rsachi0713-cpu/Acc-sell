@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X, Upload, Wallet, Banknote, CreditCard, ExternalLink, Send, CornerDownRight } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
 import { useCurrency } from '../context/CurrencyContext';
 
 const ListingView = () => {
@@ -34,36 +35,47 @@ const ListingView = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: fetchError } = await supabase
-          .from('listings')
-          .select('*, profiles:seller_id(username, full_name, avatar_url, is_online, rating, reviews, created_at, whatsapp, payment_methods)')
-          .eq('id', id)
+        // Fetching from Turso
+        const { rows } = await turso.execute({
+          sql: "SELECT * FROM listings WHERE id = ?",
+          args: [id]
+        });
+
+        if (rows.length === 0) {
+          setError('Listing not found');
+          return;
+        }
+
+        const data = rows[0];
+
+        // Fetch profile info from Supabase (since we haven't moved profiles yet)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url, is_online, rating, reviews, created_at, whatsapp, payment_methods')
+          .eq('id', data.seller_id)
           .single();
 
-        if (fetchError) throw fetchError;
-
-        if (data) {
-          const transformedItem = {
-            ...data,
-            seller: {
-              name: data.profiles?.full_name || data.profiles?.username || 'Unknown Seller',
-              rating: data.profiles?.rating || '0.0',
-              reviews: data.profiles?.reviews || 0,
-              joined: data.profiles?.created_at ? new Date(data.profiles.created_at).getFullYear() : '2024',
-              online: data.profiles?.is_online || false,
-              whatsapp: data.profiles?.whatsapp || '',
-              payment_methods: data.profiles?.payment_methods || [],
-              avatar: data.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${data.profiles?.username || 'U'}&background=1e293b&color=fff`
-            }
-          };
-          setItem(transformedItem);
-          // Set first image as active
-          const images = transformedItem.image_urls || [];
-          setActiveImage(images.length > 0 ? images[0] : transformedItem.thumbnail || '');
-        }
+        const transformedItem = {
+          ...data,
+          image_urls: data.image_urls ? JSON.parse(data.image_urls) : [],
+          seller: {
+            name: profile?.full_name || profile?.username || 'Unknown Seller',
+            rating: profile?.rating || '0.0',
+            reviews: profile?.reviews || 0,
+            joined: profile?.created_at ? new Date(profile.created_at).getFullYear() : '2024',
+            online: profile?.is_online || false,
+            whatsapp: profile?.whatsapp || '',
+            payment_methods: profile?.payment_methods || [],
+            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.username || 'U'}&background=1e293b&color=fff`
+          }
+        };
+        setItem(transformedItem);
+        // Set first image as active
+        const images = transformedItem.image_urls || [];
+        setActiveImage(images.length > 0 ? images[0] : transformedItem.thumbnail || '');
       } catch (err) {
-        console.error('Error fetching listing:', err);
-        setError('Listing not found or connection error');
+        console.error('Error fetching listing from Turso:', err);
+        setError('Connection error');
       } finally {
         setLoading(false);
       }

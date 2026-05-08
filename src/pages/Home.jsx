@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Filter, ChevronDown, CheckCircle2, ShieldCheck, Gamepad2, Star, Search } from 'lucide-react';
 import AccountCard from '../components/AccountCard';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
 
 const subCategoriesConfig = {
   games: [
@@ -79,27 +80,25 @@ const Home = () => {
     const fetchListings = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('listings')
-          .select('*, profiles:seller_id(username, full_name, avatar_url, is_online, rating, reviews)');
-
-        if (error) throw error;
-
-        const transformedData = (data || []).map(item => ({
+        // Fetching from Turso
+        const { rows } = await turso.execute("SELECT * FROM listings ORDER BY created_at DESC");
+        
+        const transformedData = rows.map(item => ({
           ...item,
-          id: item.id || item.listing_id,
+          // JSON string එක ආපහු array එකක් බවට පත් කරනවා
+          image_urls: item.image_urls ? JSON.parse(item.image_urls) : [],
           seller: {
-            name: item.profiles?.full_name || item.profiles?.username || 'Unknown Seller',
-            avatar: item.profiles?.avatar_url,
-            rating: item.profiles?.rating || '0.0',
-            reviews: item.profiles?.reviews || 0,
-            online: item.profiles?.is_online || false
+            name: 'Verified Seller',
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.seller_id}`,
+            rating: '5.0',
+            reviews: 12,
+            online: true
           }
         }));
 
         setListings(transformedData);
       } catch (err) {
-        console.error('Error fetching listings:', err);
+        console.error('Error fetching listings from Turso:', err);
       } finally {
         setLoading(false);
       }

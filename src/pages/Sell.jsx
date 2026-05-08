@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Upload, Plus, ArrowLeft, Gamepad2, ShieldCheck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
+import { uploadToR2 } from '../lib/r2';
 
 const subCategoryMap = {
   games: [
@@ -110,17 +112,9 @@ const Sell = () => {
       if (files.length === 0) return;
 
       const uploadPromises = files.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('listings')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('listings').getPublicUrl(fileName);
-        return data.publicUrl;
+        // Now using R2 instead of Supabase
+        const publicUrl = await uploadToR2(file);
+        return publicUrl;
       });
 
       const urls = await Promise.all(uploadPromises);
@@ -152,24 +146,27 @@ const Sell = () => {
     }
 
     try {
-      // Assuming a 'listings' table exists in Supabase.
-      const { error } = await supabase.from('listings').insert([
-        {
-          seller_id: user.id,
-          title: formData.title,
-          price: parseFloat(formData.price),
-          platform: formData.platform,
-          subcategory: formData.subcategory,
-          server: formData.server,
-          type: formData.type,
-          delivery_time: formData.delivery_time,
-          description: formData.description,
-          thumbnail: formData.images[0] || 'https://picsum.photos/400/225',
-          image_urls: formData.images
-        }
-      ]);
-
-      if (error) throw error;
+      // Inserting data into Turso
+      const { lastInsertRowid } = await turso.execute({
+        sql: `INSERT INTO listings (
+          seller_id, title, price, platform, subcategory, 
+          server, type, delivery_time, description, 
+          thumbnail, image_urls
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          user.id,
+          formData.title,
+          parseFloat(formData.price),
+          formData.platform,
+          formData.subcategory,
+          formData.server,
+          formData.type,
+          formData.delivery_time,
+          formData.description,
+          formData.images[0] || 'https://picsum.photos/400/225',
+          JSON.stringify(formData.images)
+        ]
+      });
 
       setMessage({ text: 'Listing created successfully! Your account is now live.', type: 'success' });
       // Reset form after success
