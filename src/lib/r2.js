@@ -16,10 +16,13 @@ export const uploadToR2 = async (file) => {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
+  // Browser එකට වඩාත්ම ගැළපෙන Blob එකක් විදිහට යවමු
+  const body = new Blob([await file.arrayBuffer()], { type: file.type });
+
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: fileName,
-    Body: file,
+    Body: body,
     ContentType: file.type,
   });
 
