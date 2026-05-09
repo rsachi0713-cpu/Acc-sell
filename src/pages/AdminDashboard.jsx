@@ -8,6 +8,7 @@ import {
   ArrowUpRight, ArrowDownRight, LayoutGrid, List, UserCheck
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -60,23 +61,33 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-      const { count: listingCount } = await supabase.from('listings').select('*', { count: 'exact', head: true });
       
-      const { data: listings } = await supabase
-        .from('listings')
-        .select('*, profiles:seller_id(full_name, email)')
-        .order('created_at', { ascending: false });
-
+      // Fetching listings from Turso
+      const { rows: listingsRows } = await turso.execute("SELECT * FROM listings ORDER BY created_at DESC");
+      const listingCount = listingsRows.length;
+      
+      // Fetch profiles from Supabase to join with listings (since profiles are still in Supabase)
       const { data: users } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
+      const listings = listingsRows.map(listing => {
+        const sellerProfile = users?.find(u => u.id === listing.seller_id);
+        return {
+          ...listing,
+          profiles: sellerProfile ? {
+            full_name: sellerProfile.full_name,
+            email: sellerProfile.email
+          } : null
+        };
+      });
+
       setStats({
         totalUsers: userCount || 0,
         totalListings: listingCount || 0,
         pendingReports: users?.filter(u => u.role === 'seller' && !u.is_verified).length || 0,
-        totalRevenue: listings?.reduce((acc, curr) => acc + (curr.price || 0), 0) || 0,
+        totalRevenue: listings?.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) || 0,
         growth: 15.8
       });
 
@@ -115,9 +126,15 @@ const AdminDashboard = () => {
 
   const handleDeleteListing = async (id) => {
     if (!window.confirm('Are you sure you want to delete this listing? It will be permanently removed.')) return;
-    const { error } = await supabase.from('listings').delete().eq('id', id);
-    if (!error) {
+    try {
+      await turso.execute({
+        sql: "DELETE FROM listings WHERE id = ?",
+        args: [id]
+      });
       setData(prev => ({ ...prev, listings: prev.listings.filter(l => l.id !== id) }));
+    } catch (err) {
+      console.error("Error deleting listing:", err);
+      alert("Delete failed: " + err.message);
     }
   };
 

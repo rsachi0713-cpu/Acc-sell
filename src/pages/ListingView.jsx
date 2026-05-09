@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X, Upload, Wallet, Banknote, CreditCard, ExternalLink, Send, CornerDownRight } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { turso } from '../lib/turso';
+import { uploadToR2 } from '../lib/r2';
 import { useCurrency } from '../context/CurrencyContext';
 
 const ListingView = () => {
@@ -173,12 +174,42 @@ const ListingView = () => {
     setIsSubmittingOrder(true);
     try {
       const fileExt = paymentSlip.name.split('.').pop();
-      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('payment-slips')
-        .upload(fileName, paymentSlip);
-        
-      if (uploadError) throw uploadError;
+      const fileName = `slips/${currentUser.id}-${Date.now()}.${fileExt}`;
+      
+      // Upload to R2 instead of Supabase
+      const slipUrl = await uploadToR2(paymentSlip, fileName);
+      
+      if (!slipUrl) throw new Error("Failed to upload slip to R2");
+
+      // Save order to Turso
+      await turso.execute({
+        sql: `INSERT INTO orders (
+          buyer_id, 
+          seller_id, 
+          listing_id, 
+          amount, 
+          slip_url, 
+          status, 
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          currentUser.id,
+          item.seller_id,
+          id,
+          item.price,
+          slipUrl,
+          'pending',
+          new Date().toISOString()
+        ]
+      });
+
+      // Notify seller
+      await supabase.from('notifications').insert({
+        user_id: item.seller_id,
+        type: 'order',
+        message: `💰 New order for "${item.title}"! Check your dashboard.`,
+        link: `/dashboard`,
+      });
       
       setIsSubmittingOrder(false);
       setOrderSuccess(true);

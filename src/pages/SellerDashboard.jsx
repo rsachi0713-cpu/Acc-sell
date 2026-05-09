@@ -28,6 +28,8 @@ import {
   Wallet
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
+import { uploadToR2 } from '../lib/r2';
 import { useCurrency } from '../context/CurrencyContext';
 
 const SellerDashboard = () => {
@@ -42,6 +44,7 @@ const SellerDashboard = () => {
     views: 0
   });
   const [myListings, setMyListings] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
   const navigate = useNavigate();
 
   const [isVerified, setIsVerified] = useState(false);
@@ -162,18 +165,43 @@ const SellerDashboard = () => {
 
   const fetchDashboardData = async (userId) => {
     try {
-      const { data: listings, error } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('seller_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { rows: listings } = await turso.execute({
+        sql: "SELECT * FROM listings WHERE seller_id = ? ORDER BY created_at DESC",
+        args: [userId]
+      });
       
       setMyListings(listings || []);
+      
+      // Fetch orders for this seller
+      const { rows: ordersRows } = await turso.execute({
+        sql: "SELECT * FROM orders WHERE seller_id = ? ORDER BY created_at DESC",
+        args: [userId]
+      });
+
+      // Get buyer profiles from Supabase
+      const buyerIds = [...new Set(ordersRows.map(o => o.buyer_id))];
+      const { data: buyerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email, whatsapp')
+        .in('id', buyerIds);
+
+      const ordersWithData = ordersRows.map(order => {
+        const listing = listings.find(l => l.id == order.listing_id);
+        const buyer = buyerProfiles?.find(b => b.id === order.buyer_id);
+        return {
+          ...order,
+          listing_title: listing?.title || 'Unknown Listing',
+          buyer: buyer || { full_name: 'Unknown Buyer' }
+        };
+      });
+
+      setMyOrders(ordersWithData);
+
       setStats(prev => ({
         ...prev,
-        activeListings: (listings || []).length
+        activeListings: (listings || []).length,
+        totalSales: ordersRows.length,
+        revenue: ordersRows.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0)
       }));
     } catch (err) {
       console.error("Fetch Data Error:", err);
@@ -182,12 +210,19 @@ const SellerDashboard = () => {
 
   const handleDeleteListing = async (listingId) => {
     if (!window.confirm("Are you sure you want to delete this listing?")) return;
-    const { error } = await supabase.from('listings').delete().eq('id', listingId);
-    if (!error) {
+    try {
+      await turso.execute({
+        sql: "DELETE FROM listings WHERE id = ?",
+        args: [listingId]
+      });
+      
       setMyListings(prev => prev.filter(l => l.id !== listingId));
       setStats(prev => ({ ...prev, activeListings: prev.activeListings - 1 }));
       setMessage({ text: 'Listing deleted successfully', type: 'success' });
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+    } catch (err) {
+      console.error("Delete Listing Error:", err);
+      setMessage({ text: 'Error deleting listing', type: 'error' });
     }
   };
 
@@ -236,11 +271,13 @@ const SellerDashboard = () => {
                      try {
                        setUploading(true);
                        const fileExt = file.name.split('.').pop();
-                       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-                       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file);
-                       if (uploadError) throw uploadError;
-                       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                       const newUrl = data.publicUrl;
+                       const fileName = `avatars/${user.id}-${Date.now()}.${fileExt}`;
+                       
+                       // Upload to R2 instead of Supabase
+                       const newUrl = await uploadToR2(file, fileName);
+                       
+                       if (!newUrl) throw new Error("Failed to upload avatar to R2");
+
                        await supabase.from('profiles').update({ avatar_url: newUrl }).eq('id', user.id);
                        setAvatarUrl(newUrl);
                        setMessage({ text: 'Profile picture updated!', type: 'success' });
@@ -442,6 +479,79 @@ const SellerDashboard = () => {
                   <div className="text-center py-20 opacity-50">
                     <Package className="w-16 h-16 mx-auto mb-4" />
                     <p>No listings found. Start selling today!</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'orders' && (
+              <div className="glass-panel p-6">
+                <h2 className="text-2xl font-bold text-white mb-8">Incoming Orders</h2>
+                {myOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {myOrders.map(order => (
+                      <div key={order.id} className="bg-gray-800/40 border border-gray-800 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-gray-700 transition-all">
+                        <div className="flex items-center gap-4 flex-1">
+                          <img 
+                            src={order.buyer.avatar_url || `https://ui-avatars.com/api/?name=${order.buyer.full_name}&background=1e293b&color=fff`} 
+                            className="w-12 h-12 rounded-full border border-gray-700 object-cover" 
+                            alt="" 
+                          />
+                          <div className="min-w-0">
+                            <h4 className="text-white font-bold truncate">{order.listing_title}</h4>
+                            <p className="text-xs text-gray-500">Ordered by <span className="text-gray-300 font-medium">{order.buyer.full_name}</span></p>
+                            <p className="text-[10px] text-gray-600 mt-1">{new Date(order.created_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-primary font-black text-lg">{formatPrice(order.amount)}</span>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${
+                            order.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+
+                        <div className="flex gap-2 w-full md:w-auto">
+                          {order.slip_url && (
+                            <a 
+                              href={order.slip_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex-1 md:flex-none px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Slip
+                            </a>
+                          )}
+                          {order.buyer.whatsapp ? (
+                            <a 
+                              href={`https://wa.me/${order.buyer.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${order.buyer.full_name}, I received your order for "${order.listing_title}". I am reviewing your payment slip now.`)}`}
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex-1 md:flex-none px-4 py-2 bg-[#25D366] hover:bg-[#22c35e] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                            >
+                              <Phone className="w-3.5 h-3.5" /> WhatsApp
+                            </a>
+                          ) : (
+                            <button 
+                              disabled
+                              className="flex-1 md:flex-none px-4 py-2 bg-gray-800 text-gray-500 rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed border border-gray-700"
+                            >
+                              <Phone className="w-3.5 h-3.5" /> No WhatsApp
+                            </button>
+                          )}
+                          <button className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold transition-all">
+                            Process
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 opacity-50 border-2 border-dashed border-gray-800 rounded-2xl">
+                    <ShoppingBag className="w-16 h-16 mx-auto mb-4" />
+                    <p>No orders yet. They will appear here when buyers purchase your items.</p>
                   </div>
                 )}
               </div>
