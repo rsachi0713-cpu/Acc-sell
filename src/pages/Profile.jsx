@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, Save, LogOut, Upload, ArrowLeft, Plus, CheckCircle2, Star, MessageSquare, ShieldAlert, Clock, Cpu, Globe, X, AlertCircle, ShoppingBag, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -18,7 +20,10 @@ const Profile = () => {
   const [myListings, setMyListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [editingListing, setEditingListing] = useState(null);
-  const [activeTab, setActiveTab] = useState('history');
+  const [activeTab, setActiveTab] = useState('cart');
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const { formatPrice } = useCurrency();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +47,43 @@ const Profile = () => {
 
     fetchUser();
   }, [navigate]);
+
+  useEffect(() => {
+    if (user) {
+      if (role === 'seller') {
+        fetchMyListings(user.id);
+      }
+      fetchMyOrders(user.id);
+
+      // Add polling for live status updates (every 10 seconds)
+      const interval = setInterval(() => {
+        fetchMyOrders(user.id);
+      }, 10000);
+
+      return () => clearInterval(interval);
+    }
+  }, [user, role]);
+
+  const fetchMyOrders = async (userId) => {
+    setOrdersLoading(true);
+    try {
+      const { rows } = await turso.execute({
+        sql: `
+          SELECT o.*, l.title, l.thumbnail, l.price as listing_price
+          FROM orders o
+          JOIN listings l ON o.listing_id = l.id
+          WHERE o.buyer_id = ?
+          ORDER BY o.created_at DESC
+        `,
+        args: [userId]
+      });
+      setOrders(rows);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Reset success state if values change
@@ -289,9 +331,6 @@ const Profile = () => {
           
 
 
-          <button type="button" onClick={() => navigate('/messages')} className="w-full mt-6 bg-primary/10 text-primary py-2.5 rounded-lg font-bold hover:bg-primary/20 transition-all flex items-center justify-center gap-2">
-            <MessageSquare className="w-4 h-4" /> My Messages
-          </button>
           <button type="button" onClick={handleLogout} className="w-full mt-4 bg-gray-800/50 text-red-400 py-2.5 rounded-lg font-medium hover:bg-gray-800">Logout</button>
         </div>
       </div>
@@ -301,64 +340,80 @@ const Profile = () => {
         <h2 className="text-2xl font-bold text-white mb-6">{role === 'seller' ? 'Seller Dashboard' : 'My Account'}</h2>
         <div className="space-y-6">
           {/* Tabs Navigation */}
-          <div className="flex border-b border-gray-800 gap-8">
-            <button 
-              onClick={() => setActiveTab('history')}
-              className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
-                activeTab === 'history' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Purchase History
-              {activeTab === 'history' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-            </button>
-            <button 
-              onClick={() => setActiveTab('cart')}
-              className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
-                activeTab === 'cart' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              Order Cart
-              {activeTab === 'cart' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
-            </button>
-          </div>
+            <div className="flex border-b border-gray-800 gap-8">
+              <button 
+                onClick={() => setActiveTab('cart')}
+                className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
+                  activeTab === 'cart' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                Order Cart
+                {activeTab === 'cart' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
+              </button>
+            </div>
 
           <div className="min-h-[400px]">
-            {activeTab === 'history' ? (
-              <div className="glass-panel p-12 text-center bg-gray-800/10">
-                <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700 shadow-xl">
-                   <Clock className="w-10 h-10 text-gray-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">No Purchase History</h3>
-                <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                  You haven't bought any accounts yet. Once you make a purchase, your order details and account credentials will appear here.
-                </p>
-                <button 
-                  onClick={() => navigate('/')} 
-                  className="bg-primary hover:bg-primary-hover text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all flex items-center gap-3 mx-auto active:scale-95"
-                >
-                  Browse Marketplace
-                </button>
+              <div className="space-y-4">
+                {ordersLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : orders.length > 0 ? (
+                  <div className="grid gap-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="glass-panel p-4 bg-gray-800/5 border border-gray-800/50 flex flex-col md:flex-row gap-4 items-center">
+                        <img 
+                          src={order.thumbnail || 'https://picsum.photos/200'} 
+                          className="w-20 h-20 rounded-xl object-cover border border-gray-800" 
+                          alt="" 
+                        />
+                        <div className="flex-1 text-center md:text-left">
+                          <h4 className="font-bold text-white mb-1">{order.title}</h4>
+                          <div className="flex flex-wrap justify-center md:justify-start gap-3 text-xs">
+                            <span className="text-primary font-bold">{formatPrice(order.amount)}</span>
+                            <span className="text-gray-500">Order ID: #{order.id}</span>
+                            <span className="text-gray-500">{new Date(order.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-center md:items-end gap-2">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                            order.status === 'approved' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 
+                            order.status === 'cancelled' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            {order.status}
+                          </span>
+                          <button 
+                            onClick={() => navigate(`/listing/${order.listing_id}`)}
+                            className="text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider"
+                          >
+                            View Item
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="glass-panel p-12 text-center bg-gray-800/10">
+                    <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700 shadow-xl">
+                       <ShoppingBag className="w-10 h-10 text-gray-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Your Cart is Empty</h3>
+                    <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                      Looks like you haven't added anything to your cart yet. Find the best gaming and social media accounts at Acc Zone
+                    </p>
+                    <button 
+                      onClick={() => navigate('/')} 
+                      className="bg-primary hover:bg-primary-hover text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all flex items-center gap-3 mx-auto active:scale-95"
+                    >
+                      Start Shopping
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="glass-panel p-12 text-center bg-gray-800/10">
-                <div className="w-20 h-20 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-700 shadow-xl">
-                   <ShoppingBag className="w-10 h-10 text-gray-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Your Cart is Empty</h3>
-                <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                  Looks like you haven't added anything to your cart yet. Find the best gaming and social media accounts at Acc Zone
-                </p>
-                <button 
-                  onClick={() => navigate('/')} 
-                  className="bg-primary hover:bg-primary-hover text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 transition-all flex items-center gap-3 mx-auto active:scale-95"
-                >
-                  Start Shopping
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Edit Modal */}
       {editingListing && (

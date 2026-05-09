@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Globe, ChevronDown, User as UserIcon, LogIn, Menu, Plus, ShieldCheck, LogOut, MessageSquare, DollarSign, Bell, X, Check } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { turso } from '../lib/turso';
 import { useCurrency } from '../context/CurrencyContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,6 +14,10 @@ const Header = () => {
   const { pathname } = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const isAdminContext = pathname.includes('admin') || searchParams.get('admin') === 'true';
+
+  // Ad Configuration
+  const [searchAdLink, setSearchAdLink] = useState('');
+  const AD_COOLDOWN = 3 * 60 * 1000; // 3 minutes
 
   // --- Notification State ---
   const [notifications, setNotifications] = useState([]);
@@ -33,6 +38,17 @@ const Header = () => {
       setUser(u);
       if (u) loadNotifications(u.id);
     });
+
+    // Fetch Ad Setting
+    const fetchAdSetting = async () => {
+      try {
+        const { rows } = await turso.execute("SELECT value FROM platform_settings WHERE key = 'ad_link_search'");
+        if (rows.length > 0) setSearchAdLink(rows[0].value);
+      } catch (err) {
+        console.error("Error fetching search ad link:", err);
+      }
+    };
+    fetchAdSetting();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -126,14 +142,14 @@ const Header = () => {
       <div className="container mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Logo */}
-        <div className="flex items-center gap-2 cursor-pointer">
-          <div className="bg-primary/20 p-1.5 rounded-lg border border-primary/30">
+        <Link to="/" className="flex items-center gap-2 cursor-pointer group">
+          <div className="bg-primary/20 p-1.5 rounded-lg border border-primary/30 group-hover:border-primary/60 transition-colors">
             <Globe className="w-6 h-6 text-primary" />
           </div>
           <span className="text-xl font-bold tracking-tight text-white hidden sm:block">
             Acc<span className="text-primary"> Zone</span>
           </span>
-        </div>
+        </Link>
 
         {/* Global Search */}
         <div className="hidden md:flex flex-1 items-center justify-center px-8">
@@ -150,7 +166,7 @@ const Header = () => {
                 <Link to="/?platform=other" className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-primary/20 transition-colors">📦 Other Accounts</Link>
               </div>
             </div>
-            <div className="flex-1 flex items-center px-3 bg-transparent rounded-r-full overflow-hidden">
+            <div className="flex-1 flex items-center pl-3 bg-transparent overflow-hidden">
               <Search className="w-4 h-4 text-gray-500 mr-2 shrink-0" />
               <input 
                 type="text" 
@@ -165,6 +181,26 @@ const Header = () => {
                 className="w-full h-full bg-transparent text-sm focus:outline-none text-gray-200 placeholder-gray-500"
               />
             </div>
+            <button 
+              onClick={() => {
+                const lastAdTime = localStorage.getItem('last_ad_time');
+                const currentTime = Date.now();
+
+                if (!lastAdTime || (currentTime - parseInt(lastAdTime)) > AD_COOLDOWN) {
+                  if (searchAdLink) {
+                    window.open(searchAdLink, '_blank');
+                    localStorage.setItem('last_ad_time', currentTime.toString());
+                  }
+                }
+
+                if (searchTerm.trim()) {
+                  navigate(`/?search=${encodeURIComponent(searchTerm.trim())}`);
+                }
+              }}
+              className="px-4 bg-primary hover:bg-primary-hover text-white text-xs font-black uppercase tracking-widest rounded-r-full transition-colors"
+            >
+              Search
+            </button>
           </div>
         </div>
 

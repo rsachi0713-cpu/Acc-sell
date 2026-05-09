@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Package, 
@@ -56,6 +56,7 @@ const SellerDashboard = () => {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -191,6 +192,7 @@ const SellerDashboard = () => {
         return {
           ...order,
           listing_title: listing?.title || 'Unknown Listing',
+          listing_data: listing,
           buyer: buyer || { full_name: 'Unknown Buyer' }
         };
       });
@@ -223,6 +225,40 @@ const SellerDashboard = () => {
     } catch (err) {
       console.error("Delete Listing Error:", err);
       setMessage({ text: 'Error deleting listing', type: 'error' });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to delete this order?")) return;
+    try {
+      await turso.execute({
+        sql: "DELETE FROM orders WHERE id = ?",
+        args: [orderId]
+      });
+      
+      setMyOrders(prev => prev.filter(o => o.id !== orderId));
+      setStats(prev => ({ ...prev, totalSales: prev.totalSales - 1 }));
+      setMessage({ text: 'Order deleted successfully', type: 'success' });
+      setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+    } catch (err) {
+      console.error("Delete Order Error:", err);
+      setMessage({ text: 'Error deleting order', type: 'error' });
+    }
+  };
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      await turso.execute({
+        sql: "UPDATE orders SET status = ? WHERE id = ?",
+        args: [newStatus, orderId]
+      });
+      
+      setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      setMessage({ text: `Order marked as ${newStatus}`, type: 'success' });
+      setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+    } catch (err) {
+      console.error("Status Change Error:", err);
+      setMessage({ text: 'Error updating status', type: 'error' });
     }
   };
 
@@ -319,12 +355,6 @@ const SellerDashboard = () => {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'profile' ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'}`}
             >
               <User className="w-5 h-5" /> Profile Settings
-            </button>
-            <button 
-              onClick={() => navigate('/messages')}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800/50 rounded-xl text-gray-400 hover:text-white transition-all font-bold"
-            >
-              <MessageCircle className="w-5 h-5" /> Messages
             </button>
             
             <div className="pt-4 mt-4 border-t border-gray-800 space-y-2">
@@ -497,9 +527,14 @@ const SellerDashboard = () => {
                             className="w-12 h-12 rounded-full border border-gray-700 object-cover" 
                             alt="" 
                           />
-                          <div className="min-w-0">
-                            <h4 className="text-white font-bold truncate">{order.listing_title}</h4>
+                          <div className="min-w-0 cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <h4 className="text-white font-bold truncate group-hover:text-primary transition-colors">{order.listing_title}</h4>
                             <p className="text-xs text-gray-500">Ordered by <span className="text-gray-300 font-medium">{order.buyer.full_name}</span></p>
+                            {order.buyer_whatsapp && (
+                              <p className="text-[10px] text-primary font-bold mt-0.5 flex items-center gap-1">
+                                <Phone className="w-2.5 h-2.5" /> {order.buyer_whatsapp}
+                              </p>
+                            )}
                             <p className="text-[10px] text-gray-600 mt-1">{new Date(order.created_at).toLocaleString()}</p>
                           </div>
                         </div>
@@ -524,9 +559,9 @@ const SellerDashboard = () => {
                               <Eye className="w-3.5 h-3.5" /> Slip
                             </a>
                           )}
-                          {order.buyer.whatsapp ? (
+                          {order.buyer_whatsapp || order.buyer.whatsapp ? (
                             <a 
-                              href={`https://wa.me/${order.buyer.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${order.buyer.full_name}, I received your order for "${order.listing_title}". I am reviewing your payment slip now.`)}`}
+                              href={`https://wa.me/${(order.buyer_whatsapp || order.buyer.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${order.buyer.full_name}, I received your order for "${order.listing_title}". I am reviewing your payment slip now.`)}`}
                               target="_blank" 
                               rel="noopener noreferrer" 
                               className="flex-1 md:flex-none px-4 py-2 bg-[#25D366] hover:bg-[#22c35e] text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all"
@@ -541,9 +576,29 @@ const SellerDashboard = () => {
                               <Phone className="w-3.5 h-3.5" /> No WhatsApp
                             </button>
                           )}
-                          <button className="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold transition-all">
-                            Process
+                          <button 
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"
+                            title="Delete Order"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
+                          <div className="relative group/status flex-1 md:flex-none">
+                            <button className="w-full px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2">
+                              Process
+                            </button>
+                            <div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1c26] border border-gray-700 rounded-xl overflow-hidden shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-20">
+                              {['pending', 'approved', 'cancelled'].map((status) => (
+                                <button
+                                  key={status}
+                                  onClick={() => handleStatusChange(order.id, status)}
+                                  className="w-full px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 hover:text-white hover:bg-gray-800 transition-colors border-b border-gray-800 last:border-0"
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -763,6 +818,95 @@ const SellerDashboard = () => {
           </div>
         </main>
       </div>
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass-panel w-full max-w-lg overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-[#0a0c12]">
+                <h3 className="font-black uppercase tracking-widest text-xs text-gray-400">Order Details</h3>
+                <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-800 rounded-lg text-gray-500 hover:text-white transition-all">
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+                {/* Listing Info */}
+                <div className="flex gap-4">
+                  <img 
+                    src={selectedOrder.listing_data?.thumbnail || 'https://picsum.photos/200'} 
+                    className="w-24 h-24 rounded-xl object-cover border border-gray-800 shadow-2xl" 
+                    alt="" 
+                  />
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-white mb-1">{selectedOrder.listing_title}</h2>
+                    <div className="text-primary font-black text-lg">{formatPrice(selectedOrder.amount)}</div>
+                    <div className="flex gap-2 mt-2">
+                       <span className="px-2 py-0.5 bg-gray-800 rounded text-[9px] font-bold text-gray-400 uppercase">{selectedOrder.listing_data?.type}</span>
+                       <span className="px-2 py-0.5 bg-gray-800 rounded text-[9px] font-bold text-gray-400 uppercase">{selectedOrder.listing_data?.server}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buyer Info */}
+                <div className="bg-[#0a0c12] border border-gray-800 rounded-2xl p-4 space-y-4">
+                   <div className="flex items-center gap-3 border-b border-gray-800 pb-4">
+                      <img 
+                        src={selectedOrder.buyer.avatar_url || `https://ui-avatars.com/api/?name=${selectedOrder.buyer.full_name}`} 
+                        className="w-10 h-10 rounded-full border border-gray-700" 
+                        alt="" 
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-gray-500 uppercase">Buyer</div>
+                        <div className="text-sm font-bold text-white">{selectedOrder.buyer.full_name}</div>
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">WhatsApp</div>
+                        <div className="text-white font-medium">{selectedOrder.buyer_whatsapp || 'Not provided'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">Order Date</div>
+                        <div className="text-white font-medium">{new Date(selectedOrder.created_at).toLocaleDateString()}</div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Listing Description */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Listing Description</h4>
+                  <p className="text-sm text-gray-400 leading-relaxed bg-[#0a0c12] p-4 rounded-xl border border-gray-800">
+                    {selectedOrder.listing_data?.description || 'No description provided.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 bg-[#0a0c12] border-t border-gray-800 flex gap-3">
+                 <button 
+                   onClick={() => {
+                     window.open(`https://wa.me/${(selectedOrder.buyer_whatsapp || selectedOrder.buyer.whatsapp || '').replace(/\D/g, '')}`, '_blank');
+                   }}
+                   className="flex-1 bg-[#25D366] hover:bg-[#22c35e] text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                 >
+                   <Phone className="w-4 h-4" /> Message Buyer
+                 </button>
+                 <button 
+                   onClick={() => setSelectedOrder(null)}
+                   className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all"
+                 >
+                   Close
+                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

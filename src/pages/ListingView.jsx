@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X, Upload, Wallet, Banknote, CreditCard, ExternalLink, Send, CornerDownRight } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Star, ShieldAlert, Cpu, Globe, CheckCircle2, MessageSquare, ShoppingCart, Clock, ChevronRight, X, Upload, Wallet, Banknote, CreditCard, ExternalLink, Send, CornerDownRight, Phone } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { turso } from '../lib/turso';
 import { uploadToR2 } from '../lib/r2';
@@ -11,6 +11,10 @@ const ListingView = () => {
   const { formatPrice } = useCurrency();
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Ad Configuration
+  const [adLinks, setAdLinks] = useState({ buynow: '', whatsapp: '' });
+  const AD_COOLDOWN = 3 * 60 * 1000; // 3 minutes
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState(null);
   const [activeImage, setActiveImage] = useState('');
@@ -23,6 +27,7 @@ const ListingView = () => {
   const [error, setError] = useState(null);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [paymentSlip, setPaymentSlip] = useState(null);
+  const [buyerWhatsapp, setBuyerWhatsapp] = useState('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [slipPreview, setSlipPreview] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -36,7 +41,16 @@ const ListingView = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetching from Turso
+        // Fetch Ad Settings
+        const { rows: adRows } = await turso.execute("SELECT * FROM platform_settings WHERE key IN ('ad_link_buynow', 'ad_link_whatsapp')");
+        const links = {};
+        adRows.forEach(row => {
+          if (row.key === 'ad_link_buynow') links.buynow = row.value;
+          if (row.key === 'ad_link_whatsapp') links.whatsapp = row.value;
+        });
+        setAdLinks(links);
+
+        // Fetching listing from Turso
         const { rows } = await turso.execute({
           sql: "SELECT * FROM listings WHERE id = ?",
           args: [id]
@@ -49,7 +63,7 @@ const ListingView = () => {
 
         const data = rows[0];
 
-        // Fetch profile info from Supabase (since we haven't moved profiles yet)
+        // Fetch profile info from Supabase
         const { data: profile } = await supabase
           .from('profiles')
           .select('username, full_name, avatar_url, is_online, rating, reviews, created_at, whatsapp, payment_methods')
@@ -75,7 +89,7 @@ const ListingView = () => {
         const images = transformedItem.image_urls || [];
         setActiveImage(images.length > 0 ? images[0] : transformedItem.thumbnail || '');
       } catch (err) {
-        console.error('Error fetching listing from Turso:', err);
+        console.error('Error fetching data from Turso:', err);
         setError('Connection error');
       } finally {
         setLoading(false);
@@ -107,8 +121,6 @@ const ListingView = () => {
       alert("Please select a rating");
       return;
     }
-    // Simulation of submission since we are strictly following user restriction requirements.
-    // In a real app, this would update the 'reviews' table.
     alert(`Thank you! Your ${rating}-star review has been submitted for moderation.`);
     setRating(0);
     setComment('');
@@ -126,7 +138,7 @@ const ListingView = () => {
       setComments(prev => [...prev, data]);
       setCommentText('');
 
-      // Notify seller (only if commenter is not the seller)
+      // Notify seller
       if (item.seller_id && item.seller_id !== currentUser.id) {
         const commenterName = currentUser.user_metadata?.full_name || 'Someone';
         await supabase.from('notifications').insert({
@@ -152,7 +164,7 @@ const ListingView = () => {
       setReplyText('');
       setReplyingTo(null);
 
-      // Notify seller (only if replier is not the seller)
+      // Notify seller
       if (item.seller_id && item.seller_id !== currentUser.id) {
         const replierName = currentUser.user_metadata?.full_name || 'Someone';
         await supabase.from('notifications').insert({
@@ -170,40 +182,34 @@ const ListingView = () => {
       alert("Please upload your payment slip first.");
       return;
     }
+
+    if (!buyerWhatsapp.trim()) {
+      alert("Please enter your WhatsApp number for contact.");
+      return;
+    }
     
     setIsSubmittingOrder(true);
     try {
       const fileExt = paymentSlip.name.split('.').pop();
       const fileName = `slips/${currentUser.id}-${Date.now()}.${fileExt}`;
       
-      // Upload to R2 instead of Supabase
       const slipUrl = await uploadToR2(paymentSlip, fileName);
-      
       if (!slipUrl) throw new Error("Failed to upload slip to R2");
 
-      // Save order to Turso
       await turso.execute({
-        sql: `INSERT INTO orders (
-          buyer_id, 
-          seller_id, 
-          listing_id, 
-          amount, 
-          slip_url, 
-          status, 
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        sql: "INSERT INTO orders (buyer_id, seller_id, listing_id, amount, slip_url, buyer_whatsapp, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         args: [
           currentUser.id,
           item.seller_id,
           id,
           item.price,
           slipUrl,
+          buyerWhatsapp,
           'pending',
           new Date().toISOString()
         ]
       });
 
-      // Notify seller
       await supabase.from('notifications').insert({
         user_id: item.seller_id,
         type: 'order',
@@ -219,6 +225,40 @@ const ListingView = () => {
       alert(err.message || "Failed to submit order. Please try again.");
       setIsSubmittingOrder(false);
     }
+  };
+
+  const handleBuyClick = () => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    const lastAdTime = localStorage.getItem('last_ad_time');
+    const currentTime = Date.now();
+
+    if (!lastAdTime || (currentTime - parseInt(lastAdTime)) > AD_COOLDOWN) {
+      if (adLinks.buynow) {
+        window.open(adLinks.buynow, '_blank');
+        localStorage.setItem('last_ad_time', currentTime.toString());
+      }
+    }
+
+    setIsPurchaseModalOpen(true);
+  };
+
+  const handleWhatsAppClick = () => {
+    const lastAdTime = localStorage.getItem('last_ad_time');
+    const currentTime = Date.now();
+
+    if (!lastAdTime || (currentTime - parseInt(lastAdTime)) > AD_COOLDOWN) {
+      if (adLinks.whatsapp) {
+        window.open(adLinks.whatsapp, '_blank');
+        localStorage.setItem('last_ad_time', currentTime.toString());
+      }
+    }
+
+    const waUrl = `https://wa.me/${item.seller.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${item.seller.name}, I am interested in your listing: ${item.title}\n\nLink: ${window.location.href}`)}`;
+    window.open(waUrl, '_blank');
   };
 
   const gallery = useMemo(() => {
@@ -474,13 +514,7 @@ const ListingView = () => {
             </div>
 
             <button 
-              onClick={() => {
-                if (!currentUser) {
-                  navigate('/login');
-                  return;
-                }
-                setIsPurchaseModalOpen(true);
-              }}
+              onClick={handleBuyClick}
               className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 mb-4 active:scale-[0.98]"
             >
                <ShoppingCart className="w-5 h-5"/> Buy Now
@@ -513,17 +547,15 @@ const ListingView = () => {
             </div>
 
             {item.seller.whatsapp ? (
-              <a 
-                href={`https://wa.me/${item.seller.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${item.seller.name}, I am interested in your listing: ${item.title}\n\nLink: ${window.location.href}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button 
+                onClick={handleWhatsAppClick}
                 className="w-full bg-[#25D366] hover:bg-[#22c35e] text-white font-bold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-green-500/10"
               >
                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
                 </svg>
                 Message Seller
-              </a>
+              </button>
             ) : (
               <button 
                 onClick={() => navigate(`/messages?userId=${item.seller_id}`)}
@@ -721,46 +753,62 @@ const ListingView = () => {
                       )}
                     </div>
 
-                    {/* Slip Upload */}
-                    <div className="space-y-3 pt-6 border-t border-gray-800">
-                      <label className="block text-sm font-bold text-white mb-2">Upload Payment Slip</label>
-                      {!slipPreview ? (
-                        <label className="border-2 border-dashed border-gray-800 rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-primary/50 cursor-pointer transition-all bg-[#0a0c12]">
-                          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                            <Upload className="w-6 h-6 text-primary" />
+                      {/* Slip Upload */}
+                      <div className="space-y-3 pt-6 border-t border-gray-800">
+                        <label className="block text-sm font-bold text-white mb-2">Upload Payment Slip</label>
+                        {!slipPreview ? (
+                          <label className="border-2 border-dashed border-gray-800 rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-primary/50 cursor-pointer transition-all bg-[#0a0c12]">
+                            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                              <Upload className="w-6 h-6 text-primary" />
+                            </div>
+                            <div className="text-center">
+                              <span className="text-sm font-bold text-gray-300">Click to upload slip</span>
+                              <p className="text-[10px] text-gray-500 mt-1 uppercase font-black">JPG or PNG (Max 5MB)</p>
+                            </div>
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  setPaymentSlip(file);
+                                  const reader = new FileReader();
+                                  reader.onload = () => setSlipPreview(reader.result);
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        ) : (
+                          <div className="relative rounded-xl overflow-hidden border border-gray-800 bg-black aspect-video group">
+                             <img src={slipPreview} className="w-full h-full object-contain" alt="Slip Preview" />
+                             <button onClick={() => { setSlipPreview(null); setPaymentSlip(null); }} className="absolute top-2 right-2 p-2 bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                               <X className="w-4 h-4" />
+                             </button>
                           </div>
-                          <div className="text-center">
-                            <span className="text-sm font-bold text-gray-300">Click to upload slip</span>
-                            <p className="text-[10px] text-gray-500 mt-1 uppercase font-black">JPG or PNG (Max 5MB)</p>
-                          </div>
-                          <input 
-                            type="file" 
-                            className="hidden" 
-                            accept="image/*" 
-                            onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                setPaymentSlip(file);
-                                const reader = new FileReader();
-                                reader.onload = () => setSlipPreview(reader.result);
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                      ) : (
-                        <div className="relative rounded-xl overflow-hidden border border-gray-800 bg-black aspect-video group">
-                           <img src={slipPreview} className="w-full h-full object-contain" alt="Slip Preview" />
-                           <button onClick={() => { setSlipPreview(null); setPaymentSlip(null); }} className="absolute top-2 right-2 p-2 bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                             <X className="w-4 h-4" />
-                           </button>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-gray-500 leading-tight">By uploading, you confirm that you have made the payment to the seller's details provided above.</p>
-                    </div>
-                  </div>
+                        )}
+                      </div>
 
-                  <div className="p-6 bg-[#0a0c12] border-t border-gray-800">
+                      <div className="space-y-2 mt-4">
+                        <label className="block text-sm font-bold text-white mb-2">Your WhatsApp Number</label>
+                        <div className="relative">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input 
+                            type="tel"
+                            value={buyerWhatsapp}
+                            onChange={(e) => setBuyerWhatsapp(e.target.value)}
+                            placeholder="e.g. 94771234567"
+                            className="w-full bg-[#0a0c12] border border-gray-800 rounded-xl py-3 pl-12 pr-4 text-white focus:border-primary outline-none transition-all"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500">The seller will contact you on this number to transfer the account.</p>
+                      </div>
+
+                      <p className="text-[10px] text-gray-500 leading-tight mt-4">By uploading, you confirm that you have made the payment to the seller's details provided above.</p>
+                    </div>
+
+                    <div className="p-6 bg-[#0a0c12] border-t border-gray-800">
                     <button 
                       onClick={handleConfirmPurchase}
                       disabled={isSubmittingOrder || !paymentSlip}

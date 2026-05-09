@@ -64,7 +64,7 @@ const Login = () => {
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: window.location.origin
+        emailRedirectTo: window.location.origin + '/login'
       }
     });
 

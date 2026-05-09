@@ -45,7 +45,7 @@ const Register = () => {
           role: formData.role,
           whatsapp: formData.whatsapp
         },
-        emailRedirectTo: window.location.origin
+        emailRedirectTo: window.location.origin + '/login'
       }
     });
 
